@@ -2043,13 +2043,16 @@ ETO组织正在为"他们"的到来做准备...
 + 习得"落英神掌"！
 
 你获得了成就: "桃花岛门客"
+`);
+              player.quest = null;
+              player.questProgress = {};
               player.achievements = player.achievements || [];
               if (!player.achievements.includes('桃花岛门客')) {
                 player.achievements.push('桃花岛门客');
               }
               saveUsers();
-`);
-              player.quest = null;
+              break;
+            }
             // 凤栖疑云任务完成
             if (player.quest === '凤栖疑云' && player.room === '珠光宝气阁') {
               const rewardExp = 180;
@@ -2075,7 +2078,61 @@ ETO组织正在为"他们"的到来做准备...
               saveUsers();
               break;
             }
+            // 青衣楼阴谋任务完成
+            if (player.quest === '青衣楼阴谋' && player.room === '青衣楼密室') {
+              const rewardExp = 250;
+              const rewardGold = 120;
+              player.exp += rewardExp;
+              player.gold += rewardGold;
+              ws.send(`【任务完成: 青衣楼阴谋】🎉
+
+你在青衣楼密室发现了霍休的惊天阴谋！
+
+原来青衣楼幕后主使正是霍休，
+他勾结外敌，意图颠覆江湖！
+
+【奖励】
++${rewardExp} 经验
++${rewardGold} 金币
+
+你获得了成就: "青衣楼克星"
+`);
+              player.quest = null;
               player.questProgress = {};
+              player.achievements = player.achievements || [];
+              if (!player.achievements.includes('青衣楼克星')) {
+                player.achievements.push('青衣楼克星');
+              }
+              saveUsers();
+              break;
+            }
+            // 紫禁之战任务完成
+            if (player.quest === '紫禁之战' && player.room === '紫禁之巅') {
+              const rewardExp = 300;
+              const rewardGold = 150;
+              player.exp += rewardExp;
+              player.gold += rewardGold;
+              ws.send(`【任务完成: 紫禁之战】🎉
+
+你见证了西门吹雪与叶孤城的世纪决战！
+
+最终，西门吹雪剑更胜一筹，
+叶孤城陨落紫禁之巅。
+
+【奖励】
++${rewardExp} 经验
++${rewardGold} 金币
++ 习得"天外飞仙"！
+
+你获得了成就: "紫禁见证者"
+`);
+              player.quest = null;
+              player.questProgress = {};
+              player.achievements = player.achievements || [];
+              if (!player.achievements.includes('紫禁见证者')) {
+                player.achievements.push('紫禁见证者');
+              }
+              saveUsers();
               break;
             }
             ws.send(`【当前任务】${player.quest}\n进度: ${JSON.stringify(player.questProgress)}\n>`);
@@ -2084,9 +2141,15 @@ ETO组织正在为"他们"的到来做准备...
               ws.send(`【任务系统】\n可接任务:\n- 三体降临 (需50经验)\n输入 "quest accept 三体降临" 接受任务\n>`);
             } else if (player.room === '远洋客轮甲板' || player.room === '客轮船头' || player.room === '风暴海域') {
               ws.send(`【任务系统】\n可接任务:\n- 远洋迷雾 (需30经验)\n输入 "quest accept 远洋迷雾" 接受任务\n>`);
+            } else if (player.room === '六扇门分署' || player.room === '六扇门捕头') {
+              ws.send(`【任务系统】\n可接任务:\n- 凤栖疑云 (需100经验)\n- 青衣楼阴谋 (需150经验)\n输入 "quest accept 凤栖疑云" 或 "quest accept 青衣楼阴谋" 接受任务\n>`);
+            } else if (player.room === '紫禁之巅' || player.room === '皇宫殿顶') {
+              ws.send(`【任务系统】\n可接任务:\n- 紫禁之战 (需200经验)\n输入 "quest accept 紫禁之战" 接受任务\n>`);
+            } else if (player.room === '桃花岛' || player.room === '桃花阵入口' || player.room === '桃花岛外') {
+              ws.send(`【任务系统】\n可接任务:\n- 桃花岛 (需60经验)\n输入 "quest accept 桃花岛" 接受任务\n>`);
             } else {
               ws.send(`【任务系统】\n你还没有任务。\n特定地点可接任务:
-- 六扇门分署: 凤栖疑云、追捕青衣楼\n- 粒子实验室/天文台: 三体降临\n- 客轮甲板: 远洋迷雾\n>`);
+- 六扇门分署: 凤栖疑云、青衣楼阴谋\n- 粒子实验室/天文台: 三体降临\n- 客轮甲板: 远洋迷雾\n>`);
           }
           }
           break;

@@ -130,8 +130,11 @@
     const sendBtn = document.getElementById('send-btn');
     
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${location.host}`);
-
+    let ws;
+    let reconnectAttempts = 0;
+    let heartbeatInterval;
+    
+    // ========== 辅助函数 ==========
     function appendOutput(text, className = '') {
       const div = document.createElement('div');
       div.textContent = text;
@@ -165,25 +168,60 @@
       container.scrollTop = container.scrollHeight;
     }
 
-    ws.onopen = () => {
-      appendOutput('正在连接服务器...', 'system');
-    };
+    function connect() {
+      ws = new WebSocket(`${protocol}//${location.host}`);
+      
+      ws.onopen = () => {
+        appendOutput('✓ 连接成功！', 'system');
+        reconnectAttempts = 0;
+        startHeartbeat();
+      };
 
-    ws.onmessage = (event) => {
-      appendOutput(event.data);
-    };
+      ws.onmessage = (event) => {
+        appendOutput(event.data);
+      };
 
-    ws.onerror = (error) => {
-      appendOutput('连接出错: ' + error, 'error');
-    };
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        appendOutput('连接出错，请稍候...', 'error');
+      };
 
-    ws.onclose = () => {
-      appendOutput('连接已断开，请刷新页面重试。', 'error');
-    };
+      ws.onclose = (event) => {
+        appendOutput(`连接断开 (code: ${event.code})，正在重连...`, 'error');
+        stopHeartbeat();
+        // 自动重连
+        if (reconnectAttempts < 10) {
+          reconnectAttempts++;
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+          setTimeout(connect, delay);
+        } else {
+          appendOutput('重连失败，请刷新页面。', 'error');
+        }
+      };
+    }
+    
+    function startHeartbeat() {
+      // 每25秒发送心跳
+      heartbeatInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send('');
+        }
+      }, 25000);
+    }
+    
+    function stopHeartbeat() {
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+      }
+    }
+    
+    // 初始连接
+    connect();
 
     function sendCommand() {
       const cmd = input.value.trim();
-      if (cmd && ws.readyState === WebSocket.OPEN) {
+      if (cmd && ws && ws.readyState === WebSocket.OPEN) {
         ws.send(cmd);
         input.value = '';
       }
