@@ -201,12 +201,12 @@
     }
     
     function startHeartbeat() {
-      // 每25秒发送心跳
+      // 每60秒发送心跳（带趣味指令）
       heartbeatInterval = setInterval(() => {
         if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send('');
+          ws.send('/weather');  // 服务端会返回随机趣味内容
         }
-      }, 25000);
+      }, 60000);
     }
     
     function stopHeartbeat() {
