@@ -7,6 +7,18 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// 服务器启动时间
+const serverStartTime = Date.now();
+
+// 计算运行时间
+function getUptime() {
+  const diff = Date.now() - serverStartTime;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return { days, hours, minutes };
+}
+
 app.use(express.static('public'));
 
 const usersFile = './users.json';
@@ -352,6 +364,241 @@ const rooms = {
     shop: null,
     area: '江湖'
   },
+
+  // ===== 古龙小说场景 =====
+  // 多情剑客无情剑
+  '兴云庄': {
+    description: '兴云庄外，梅花清香浮动。这里是"兵器谱"上排名第一的"小李飞刀"李寻欢的故居。',
+    exits: { '北': '保定城', '进入': '兴云庄大厅' },
+    npcs: ['兴云庄弟子'],
+    shop: null,
+    area: '江湖'
+  },
+  '兴云庄大厅': {
+    description: '兴云庄大厅，布置典雅。龙啸云与林诗音曾在此居住。',
+    exits: { '出': '兴云庄', '东': '梅花庵' },
+    npcs: ['林诗音', '龙啸云'],
+    shop: null,
+    area: '江湖'
+  },
+  '梅花庵': {
+    description: '一片梅林，梅花盛开如雪。梅花庵主在此隐居。',
+    exits: { '西': '兴云庄大厅', '北': '关外' },
+    npcs: ['梅花庵主'],
+    shop: null,
+    area: '江湖'
+  },
+  '保定城': {
+    description: '保定城，北方重镇。城门上贴着兵器谱排行榜。',
+    exits: { '南': '兴云庄', '北': '关外', '东': '金钱帮' },
+    npcs: ['城门守卫', '说书人'],
+    shop: null,
+    area: '江湖'
+  },
+  '关外': {
+    description: '关外大漠，黄沙漫天。这里是伊哭的成名之地。',
+    exits: { '南': '保定城', '西南': '兴云庄', '西北': '大漠客栈' },
+    npcs: ['关外牧民', '伊哭'],
+    shop: null,
+    area: '江湖'
+  },
+  '大漠客栈': {
+    description: '大漠中唯一的客栈，过往商旅在此歇脚。',
+    exits: { '东南': '关外' },
+    npcs: ['客栈老板', '大漠商人'],
+    shop: null,
+    area: '江湖'
+  },
+  '金钱帮': {
+    description: '金钱帮总舵，金银铺地，珠光宝气。上官金虹在此称霸。',
+    exits: { '西': '保定城', '进入': '金钱帮大厅' },
+    npcs: ['金钱帮弟子'],
+    shop: null,
+    area: '江湖'
+  },
+  '金钱帮大厅': {
+    description: '金钱帮议事大厅，墙上挂着"金钱帮"三个大字。',
+    exits: { '出': '金钱帮' },
+    npcs: ['上官金虹', '荆无命'],
+    shop: null,
+    area: '江湖'
+  },
+
+  // 陆小凤传奇
+  '凤凰集': {
+    description: '凤凰集，一个神秘的市集。江湖传言这里有最好的剑客和最好的酒。',
+    exits: { '东': '黑虎街', '北': '白云观' },
+    npcs: ['神秘商人'],
+    shop: null,
+    area: '江湖'
+  },
+  '黑虎街': {
+    description: '黑虎街，凤凰集最繁华的街道。有一个孤独的剑客常常在这里喝酒。',
+    exits: { '西': '凤凰集', '酒馆': '凤求凰酒馆' },
+    npcs: ['孤独剑客'],
+    shop: null,
+    area: '江湖'
+  },
+  '凤求凰酒馆': {
+    description: '凤求凰酒馆，江湖中最负盛名的酒馆。据说什么人都能在这里找到。',
+    exits: { '出': '黑虎街' },
+    npcs: ['老板娘', '陆小凤', '花满楼'],
+    shop: null,
+    area: '江湖'
+  },
+  '白云观': {
+    description: '白云观，道教圣地。观主白云真人精通太极。',
+    exits: { '南': '凤凰集', '西北': '珠光宝气阁' },
+    npcs: ['白云真人'],
+    shop: null,
+    area: '江湖'
+  },
+  '幽灵山庄': {
+    description: '幽灵山庄，江湖中最神秘的杀手山庄。主人是"剑神"西门吹雪。',
+    exits: { '南': '万梅山庄', '进入': '幽灵山庄内' },
+    npcs: ['幽灵杀手'],
+    shop: null,
+    area: '江湖'
+  },
+  '万梅山庄': {
+    description: '万梅山庄，西门吹雪的居所。一年四季梅花盛开。',
+    exits: { '北': '幽灵山庄', '西北': '凤栖城' },
+    npcs: ['西门吹雪'],
+    shop: null,
+    area: '江湖'
+  },
+
+  // 楚留香传奇
+  '神水宫': {
+    description: '神水宫，江湖中最神秘的门派。宫主水母阴姬神功盖世。',
+    exits: { '南': '长江', '进入': '神水宫内' },
+    npcs: ['神水宫弟子'],
+    shop: null,
+    area: '江湖'
+  },
+  '神水宫内': {
+    description: '神水宫内部，白玉为阶，珍珠为帘。',
+    exits: { '出': '神水宫', '密道': '地下水宫' },
+    npcs: ['水母阴姬', '中原一点红'],
+    shop: null,
+    area: '江湖'
+  },
+  '地下水宫': {
+    description: '地下水宫，阴暗潮湿。这是神水宫的禁地。',
+    exits: { '返回': '神水宫内' },
+    npcs: [],
+    shop: null,
+    area: '江湖'
+  },
+  '长江': {
+    description: '长江水面辽阔，一望无际。楚留香的船就停泊在岸边。',
+    exits: { '北': '神水宫', '东': '江南', '船': '楚留香船' },
+    npcs: ['船夫', '楚留香'],
+    shop: null,
+    area: '江湖'
+  },
+  '楚留香船': {
+    description: '楚留香的船，精致华丽。船上藏满了美酒。',
+    exits: { '下船': '长江' },
+    npcs: ['楚留香', '张洁洁'],
+    shop: null,
+    area: '江湖'
+  },
+  '江南': {
+    description: '江南水乡，烟雨蒙蒙。这里是鱼米之乡。',
+    exits: { '西': '长江', '南': '苏州', '东': '快活王' },
+    npcs: ['江南女子', '书生'],
+    shop: null,
+    area: '江湖'
+  },
+  '苏州': {
+    description: '苏州，园林之城。慕容九妹的别墅就在此地。',
+    exits: { '北': '江南', '别院': '慕容别院' },
+    npcs: ['苏州姑娘', '慕容九妹'],
+    shop: null,
+    area: '江湖'
+  },
+  '慕容别院': {
+    description: '慕容九妹的别院，精致典雅。',
+    exits: { '出': '苏州' },
+    npcs: ['慕容九妹'],
+    shop: null,
+    area: '江湖'
+  },
+  '快活王': {
+    description: '快活王的地盘，荒漠中的绿洲。这里是江湖中最热闹的销金窟。',
+    exits: { '西': '江南', '进入': '快活王府' },
+    npcs: ['快活王'],
+    shop: null,
+    area: '江湖'
+  },
+  '快活王府': {
+    description: '快活王府，金碧辉煌。酒色财气，应有尽有。',
+    exits: { '出': '快活王' },
+    npcs: ['快活王', '柴玉关'],
+    shop: null,
+    area: '江湖'
+  },
+
+  // 绝代双骄
+  '恶人谷': {
+    description: '恶人谷，江湖中恶人的避难所。十大恶人在此定居。',
+    exits: { '西北': '移花宫', '进入': '恶人谷内' },
+    npcs: ['恶人谷弟子'],
+    shop: null,
+    area: '江湖'
+  },
+  '恶人谷内': {
+    description: '恶人谷内部，阴森恐怖。十大恶人各据一方。',
+    exits: { '出': '恶人谷', '山洞': '恶人洞' },
+    npcs: ['杜杀', '李大嘴', '哈哈儿', '屠娇娇', '阴九幽', '白开心', '欧阳兄弟', '铁战'],
+    shop: null,
+    area: '江湖'
+  },
+  '移花宫': {
+    description: '移花宫，江湖中最神秘的门派。两位宫主邀月、怜星美貌无双，功法盖世。',
+    exits: { '东南': '恶人谷', '进入': '移花宫内' },
+    npcs: ['移花宫弟子'],
+    shop: null,
+    area: '江湖'
+  },
+  '移花宫内': {
+    description: '移花宫内部，美轮美奂。如月当空，优雅神秘。',
+    exits: { '出': '移花宫' },
+    npcs: ['邀月宫主', '怜星宫主', '花无缺'],
+    shop: null,
+    area: '江湖'
+  },
+  '恶人洞': {
+    description: '恶人谷深处的山洞，十大恶人的藏宝之地。',
+    exits: { '返回': '恶人谷内' },
+    npcs: ['小仙女'],
+    shop: null,
+    area: '江湖'
+  },
+  '龟山': {
+    description: '龟山，江湖中著名的战场。轩辕三光在此开设赌场。',
+    exits: { '北': '恶人谷', '南': '安庆' },
+    npcs: ['轩辕三光', '赌徒'],
+    shop: null,
+    area: '江湖'
+  },
+  '安庆': {
+    description: '安庆城，江南重镇。江别鹤的府邸在此。',
+    exits: { '北': '龟山', '江府': '江别鹤府' },
+    npcs: ['安庆居民', '江别鹤'],
+    shop: null,
+    area: '江湖'
+  },
+  '江别鹤府': {
+    description: '江别鹤的府邸，表面是善人，暗地里是江湖中人。',
+    exits: { '出': '安庆' },
+    npcs: ['江别鹤', '江玉郎'],
+    shop: null,
+    area: '江湖'
+  },
+
+  // 武器铺
   '武器铺': {
     description: '武器铺内挂满了各种兵器，墙上挂着屠龙刀和倚天剑。',
     exits: { '南': '扬州街' },
@@ -945,11 +1192,14 @@ wss.on('connection', (ws) => {
         onlinePlayers[tempName] = ws;
         state = 'playing';
         
-        // 欢迎消息 + 在线人数
+        // 欢迎消息 + 在线人数 + 运行时间
         const onlineCount = Object.keys(onlinePlayers).length;
+        const uptime = getUptime();
         ws.send(`╔════════════════════════════════════╗
 ║   欢迎${tempName}登陆武侠世界！         ║
 ║   当前在线玩家: ${onlineCount}人               ║
+║   江湖儿女江湖老，一片冰心在玉壶       ║
+║   世界已经运行了${uptime.days}天${uptime.hours}小时${uptime.minutes}分钟    ║
 ╚════════════════════════════════════╝
 `);
         ws.send(formatOutput(player, `欢迎回来，${tempName}！`));
