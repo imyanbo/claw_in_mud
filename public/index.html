@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>武侠世界 MUD</title>
+  <style>
+    @keyframes glow {
+      from { text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff; }
+      to { text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff; }
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
+      color: #eee;
+      font-family: "KaiTi", "楷体", "SimKai", "STKaiti", "Courier New", monospace;
+      margin: 0;
+      padding: 20px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    h1 {
+      text-align: center;
+      color: #e94560;
+      text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+      margin: 0 0 20px 0;
+      font-size: 2em;
+      letter-spacing: 4px;
+    }
+    #game-container {
+      flex: 1;
+      background: rgba(22, 33, 62, 0.9);
+      border: 2px solid #0f3460;
+      border-radius: 8px;
+      padding: 20px;
+      overflow-y: auto;
+      max-width: 900px;
+      margin: 0 auto;
+      width: 100%;
+      white-space: pre-wrap;
+      line-height: 1.8;
+      font-size: 16px;
+      box-shadow: 0 0 20px rgba(233, 69, 96, 0.2);
+    }
+    #input-area {
+      display: flex;
+      max-width: 900px;
+      margin: 10px auto 0;
+      width: 100%;
+    }
+    #command-input {
+      flex: 1;
+      padding: 14px;
+      font-size: 18px;
+      background: rgba(15, 52, 96, 0.8);
+      border: 2px solid #0f3460;
+      color: #eee;
+      border-radius: 4px 0 0 4px;
+      font-family: inherit;
+    }
+    #command-input:focus {
+      outline: none;
+      border-color: #e94560;
+      box-shadow: 0 0 10px rgba(233, 69, 96, 0.4);
+    }
+    #send-btn {
+      padding: 14px 28px;
+      background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+      border: none;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      border-radius: 0 4px 4px 0;
+      font-family: inherit;
+      font-weight: bold;
+    }
+    #send-btn:hover {
+      background: linear-gradient(135deg, #ff6b6b 0%, #e94560 100%);
+    }
+    
+    /* 战斗区域特殊样式 */
+    .combat {
+      color: #ffd700;
+      text-shadow: 1px 1px 2px #000;
+    }
+    .combat-header {
+      color: #ff4444;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .combat-win {
+      color: #44ff44;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .combat-lose {
+      color: #ff4444;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .damage-player {
+      color: #ff6b6b;
+    }
+    .damage-enemy {
+      color: #4ecca3;
+    }
+    .hp-bar {
+      color: #ff9f43;
+    }
+    
+    .system { color: #888; }
+    .room-title { color: #e94560; font-weight: bold; font-size: 18px; }
+    .player-info { color: #4ecca3; }
+    .error { color: #ff6b6b; }
+    .prompt { color: #ffd700; }
+  </style>
+</head>
+<body>
+  <h1>🏯 武侠世界 MUD</h1>
+  <div id="game-container"></div>
+  <div id="input-area">
+    <input type="text" id="command-input" placeholder="输入指令..." autocomplete="off">
+    <button id="send-btn">发送</button>
+  </div>
+
+  <script>
+    const container = document.getElementById('game-container');
+    const input = document.getElementById('command-input');
+    const sendBtn = document.getElementById('send-btn');
+    
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${location.host}`);
+
+    function appendOutput(text, className = '') {
+      const div = document.createElement('div');
+      div.textContent = text;
+      if (className) div.className = className;
+      
+      // 战斗消息特殊样式
+      if (text.includes('战斗') || text.includes('⚔️') || text.includes('🏆') || text.includes('💀')) {
+        div.style.cssText = 'color: #ffd700; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; margin: 5px 0; border-left: 3px solid #e94560;';
+      }
+      if (text.includes('战斗胜利') || text.includes('🏆')) {
+        div.style.cssText = 'color: #44ff44; background: rgba(0,50,0,0.3); padding: 10px; border-radius: 4px; margin: 5px 0; border-left: 3px solid #44ff44; font-size: 17px;';
+      }
+      if (text.includes('战斗落败') || text.includes('💀')) {
+        div.style.cssText = 'color: #ff4444; background: rgba(50,0,0,0.3); padding: 10px; border-radius: 4px; margin: 5px 0; border-left: 3px solid #ff4444; font-size: 17px;';
+      }
+      
+      // 三体宇宙线剧情特殊样式 - 科幻感
+      if (text.includes('观测天空') || text.includes('解码信号') || text.includes('地外文明') || text.includes('三体') || text.includes('倒计时') || text.includes('深空') || text.includes('半人马座')) {
+        div.style.cssText = 'color: #00ffff; background: rgba(0,30,50,0.5); padding: 12px; border-radius: 6px; margin: 8px 0; border-left: 4px solid #00ffff; font-size: 16px; text-shadow: 0 0 5px #00ffff; animation: glow 2s ease-in-out infinite alternate;';
+      }
+      // 任务开始/更新
+      if (text.includes('【任务开始') || text.includes('任务更新')) {
+        div.style.cssText = 'color: #ff6b35; background: rgba(30,20,0,0.5); padding: 12px; border-radius: 6px; margin: 8px 0; border-left: 4px solid #ff6b35; font-size: 16px; font-weight: bold;';
+      }
+      // 阵营选择
+      if (text.includes('加入阵营') || text.includes('阵营')) {
+        div.style.cssText = 'color: #bf40bf; background: rgba(30,0,40,0.5); padding: 10px; border-radius: 6px; margin: 5px 0; border-left: 3px solid #bf40bf;';
+      }
+      
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    ws.onopen = () => {
+      appendOutput('正在连接服务器...', 'system');
+    };
+
+    ws.onmessage = (event) => {
+      appendOutput(event.data);
+    };
+
+    ws.onerror = (error) => {
+      appendOutput('连接出错: ' + error, 'error');
+    };
+
+    ws.onclose = () => {
+      appendOutput('连接已断开，请刷新页面重试。', 'error');
+    };
+
+    function sendCommand() {
+      const cmd = input.value.trim();
+      if (cmd && ws.readyState === WebSocket.OPEN) {
+        ws.send(cmd);
+        input.value = '';
+      }
+    }
+
+    sendBtn.addEventListener('click', sendCommand);
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendCommand();
+    });
+
+    input.focus();
+  </script>
+</body>
+</html>
