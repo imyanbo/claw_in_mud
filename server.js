@@ -971,6 +971,14 @@ wss.on('connection', (ws) => {
 `);
         ws.send(formatOutput(player, `欢迎回来，${tempName}！`));
         
+        // 生成session token
+        const sessionToken = Math.random().toString(36).substring(2);
+        users[tempName].sessionToken = sessionToken;
+        saveUsers();
+        
+        // 发送session token给客户端（客户端会保存）
+        ws.send(`session:${sessionToken}`);
+        
         // 通知关注者
         if (savedData && savedData.follows) {
           for (const followedName of savedData.follows) {
@@ -2162,6 +2170,34 @@ ETO组织正在为"他们"的到来做准备...
               ws.send(`【任务系统】\n你还没有任务。\n特定地点可接任务:
 - 六扇门分署: 凤栖疑云、青衣楼阴谋\n- 粒子实验室/天文台: 三体降临\n- 客轮甲板: 远洋迷雾\n>`);
           }
+          }
+          break;
+
+        // 自动重连
+        case '/reconnect':
+          if (args) {
+            const parts = args.split(' ');
+            const reconnectName = parts[0];
+            const reconnectToken = parts[1];
+            if (reconnectName && reconnectToken && users[reconnectName] && users[reconnectName].sessionToken === reconnectToken) {
+              // 恢复会话
+              player = createPlayer(reconnectName);
+              Object.assign(player, users[reconnectName]);
+              players[reconnectName] = player;
+              onlinePlayers[reconnectName] = ws;
+              state = 'playing';
+              // 生成新token
+              const newToken = Math.random().toString(36).substring(2);
+              users[reconnectName].sessionToken = newToken;
+              saveUsers();
+              ws.send(`✓ 自动登录成功！欢迎回来，${reconnectName}！\n`);
+              ws.send(formatOutput(player, `欢迎回来，${reconnectName}！`));
+              appendOutput(`session:${newToken}`, 'system');
+              break;
+            } else {
+              ws.send('登录已过期，请重新登录。\n>');
+              break;
+            }
           }
           break;
 

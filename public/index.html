@@ -133,6 +133,8 @@
     let ws;
     let reconnectAttempts = 0;
     let heartbeatInterval;
+    let sessionToken = localStorage.getItem('mud_session');
+    let playerName = localStorage.getItem('mud_player');
     
     // ========== 辅助函数 ==========
     function appendOutput(text, className = '') {
@@ -175,9 +177,23 @@
         appendOutput('✓ 连接成功！', 'system');
         reconnectAttempts = 0;
         startHeartbeat();
+        // 如果有保存的session，自动恢复登录
+        if (sessionToken && playerName) {
+          ws.send('/reconnect ' + playerName + ' ' + sessionToken);
+        }
       };
 
       ws.onmessage = (event) => {
+        // 检查是否包含session token
+        if (event.data && event.data.startsWith('session:')) {
+          const token = event.data.substring(8);
+          localStorage.setItem('mud_session', token);
+          // 玩家名从欢迎消息中提取
+          const match = event.data.match(/欢迎(.*?)登陆/);
+          if (match) {
+            localStorage.setItem('mud_player', match[1]);
+          }
+        }
         appendOutput(event.data);
       };
 
