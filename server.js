@@ -1107,6 +1107,7 @@ wss.on('connection', (ws) => {
         
         case 'go':
         case '走':
+        case '观测':
         case '出海':
         case '船头':
         case '甲板':
@@ -1133,7 +1134,17 @@ wss.on('connection', (ws) => {
         case '东郊':
         case '凤栖':
           let goArgs = args || cmd;
-          if (cmd === '出海') goArgs = '远洋客轮甲板';
+          // 出海指令特殊处理：只有在水边才能出海
+          if (cmd === '出海') {
+            if (player.room === '扬州码头') {
+              goArgs = '上船';
+            } else if (player.room === '枫林渡口') {
+              goArgs = '登船';
+            } else {
+              ws.send('你必须先前往扬州码头才能出海。\n>');
+              break;
+            }
+          }
           const r = getRoom(player.room);
           // 支持直接输入房间名导航
           if (!r.exits[goArgs]) {
