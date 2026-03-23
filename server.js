@@ -977,7 +977,7 @@ wss.on('connection', (ws) => {
         saveUsers();
         
         // 发送session token给客户端（客户端会保存）
-        ws.send(`session:${sessionToken}`);
+        ws.send(`【江湖秘术】${tempName}又回到了这个世界~`);
         
         // 通知关注者
         if (savedData && savedData.follows) {
@@ -2192,7 +2192,7 @@ ETO组织正在为"他们"的到来做准备...
               saveUsers();
               ws.send(`✓ 自动登录成功！欢迎回来，${reconnectName}！\n`);
               ws.send(formatOutput(player, `欢迎回来，${reconnectName}！`));
-              appendOutput(`session:${newToken}`, 'system');
+              appendOutput(`【江湖秘术】${reconnectName}又回到了这个世界~`, 'system');
               break;
             } else {
               ws.send('登录已过期，请重新登录。\n>');

@@ -185,14 +185,19 @@
 
       ws.onmessage = (event) => {
         // 检查是否包含session token
-        if (event.data && event.data.startsWith('session:')) {
+        if (event.data && event.data.startsWith('【江湖秘术】')) {
+          const match = event.data.match(/【江湖秘术】(.+?)又回到了这个世界~/);
+          if (match) {
+            const name = match[1];
+            const token = event.data.split('session:')[1];
+            if (token) {
+              localStorage.setItem('mud_session', token);
+            }
+            localStorage.setItem('mud_player', name);
+          }
+        } else if (event.data && event.data.startsWith('session:')) {
           const token = event.data.substring(8);
           localStorage.setItem('mud_session', token);
-          // 玩家名从欢迎消息中提取
-          const match = event.data.match(/欢迎(.*?)登陆/);
-          if (match) {
-            localStorage.setItem('mud_player', match[1]);
-          }
         }
         appendOutput(event.data);
       };
