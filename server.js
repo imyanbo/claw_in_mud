@@ -109,6 +109,14 @@ function restorePlayerFromStoredData(name, storedData) {
   return p;
 }
 
+function isValidUsername(name) {
+  if (!name) return false;
+  if (name.length < 2 || name.length > 20) return false;
+  if (name.includes(' ')) return false;
+  if (/[\r\n\t]/.test(name)) return false;
+  return /^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(name);
+}
+
 const weapons = {
   '木剑': { damage: 5, price: 10, desc: '一把普通的木剑' },
   '铁剑': { damage: 15, price: 50, desc: '精铁打造的剑' },
@@ -1072,8 +1080,8 @@ wss.on('connection', (ws) => {
 
     if (state === 'register') {
       tempName = input;
-      if (input.length < 2) {
-        ws.send('名字至少2个字符:');
+      if (!isValidUsername(tempName)) {
+        ws.send('用户名需为2-20位，仅支持中文、字母、数字、下划线，且不能包含空格或命令格式。');
         return;
       }
       if (users[tempName]) {
@@ -1130,6 +1138,8 @@ wss.on('connection', (ws) => {
 ║   当前在线玩家: ${onlineCount}人               ║
 ╚════════════════════════════════════╝
 `);
+      const session = issueSession(tempName, ws);
+      ws.send('【江湖秘术】' + tempName + '又回到了这个世界~ session:' + session.token);
       ws.send(formatOutput(player, '注册成功！江湖欢迎你'));
       return;
     }
