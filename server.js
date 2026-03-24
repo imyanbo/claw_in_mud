@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const fs = require('fs');
+const crypto = require('crypto');
 const db = require('./db');
 
 const app = express();
@@ -20,7 +21,31 @@ function getUptime() {
   return { days, hours, minutes };
 }
 
-app.use(express.static('public'));
+db.initDatabase();
+db.invalidateAllSessionsForVersionMismatch();
+
+const APP_VERSION = db.APP_VERSION;
+
+app.get('/api/version', (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.json({
+    frontendVersion: APP_VERSION,
+    serverVersion: APP_VERSION,
+    minClientVersion: APP_VERSION
+  });
+});
+
+app.use(express.static('public', {
+  etag: true,
+  lastModified: true,
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=300');
+    }
+  }
+}));
 
 const usersFile = './users.json';
 let users = {};
@@ -33,57 +58,55 @@ try {
   console.log('无法读取用户数据');
 }
 
-// Load from SQLite if database exists
-try {
-  const Database = require('better-sqlite3');
-  const sqldb = new Database('./mud.db');
-  const rows = sqldb.prepare('SELECT * FROM users').all();
-  for (const row of rows) {
-    if (!users[row.name]) {
-      users[row.name] = {
-        ...row,
-        skills: JSON.parse(row.skills || '{}'),
-        inventory: JSON.parse(row.inventory || '[]'),
-        follows: JSON.parse(row.follows || '[]'),
-        questProgress: JSON.parse(row.questProgress || '{}'),
-        achievements: JSON.parse(row.achievements || '[]'),
-        先天: JSON.parse(row.先天 || '{}')
-      };
-    }
-  }
-  sqldb.close();
-  console.log('Loaded users from SQLite:', Object.keys(users).length);
-} catch (e) {
-  console.log('SQLite not available, using JSON only');
+const importedCount = db.migrateFromJsonUsers(users);
+if (importedCount > 0) {
+  console.log(`Migrated ${importedCount} users from users.json into SQLite`);
+}
+
+users = Object.fromEntries(db.getAllUsers().map((user) => [user.name, user]));
+
+function reloadUsersFromDb() {
+  users = Object.fromEntries(db.getAllUsers().map((user) => [user.name, user]));
 }
 
 function saveUsers() {
-  fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
-  
-  // Also save to SQLite
-  try {
-    const Database = require('better-sqlite3');
-    const sqldb = new Database('./mud.db');
-    const stmt = sqldb.prepare(`
-      INSERT OR REPLACE INTO users (name, password, exp, level, gold, hp, mp, maxHp, maxMp, room, skills, inventory, weapon, armor, title, follows, master, school, quest, questProgress, achievements, sessionToken, 先天, 气血, 内力, 外功攻击, 内功攻击, 防御, 身法, 命中, 闪避, 暴击, 门派声望)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    for (const [name, user] of Object.entries(users)) {
-      stmt.run(
-        user.name || name, user.password, user.exp || 0, user.level || 1, user.gold || 50,
-        user.hp || 100, user.mp || 50, user.maxHp || 100, user.maxMp || 50, user.room || '客栈',
-        JSON.stringify(user.skills || {}), JSON.stringify(user.inventory || []), user.weapon, user.armor,
-        user.title || '初入江湖', JSON.stringify(user.follows || []), user.master, user.school,
-        user.quest, JSON.stringify(user.questProgress || {}), JSON.stringify(user.achievements || []),
-        user.sessionToken || null, JSON.stringify(user.先天 || {}),
-        user.气血 || 100, user.内力 || 50, user.外功攻击 || 10, user.内功攻击 || 0,
-        user.防御 || 5, user.身法 || 10, user.命中 || 80, user.闪避 || 10, user.暴击 || 5, user.门派声望 || 0
-      );
-    }
-    sqldb.close();
-  } catch (e) {
-    // SQLite save failed, JSON backup is still available
+  for (const user of Object.values(users)) {
+    db.saveUser(user);
   }
+  fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
+}
+
+function issueSession(userName, ws) {
+  const meta = {
+    clientVersion: ws.clientVersion || null,
+    ip: ws._socket?.remoteAddress || null,
+    userAgent: ws._socket?.parser ? null : null
+  };
+  const session = db.createSession(userName, meta);
+  ws.sessionToken = session.token;
+  ws.send(`session:${session.token}`);
+  ws.send(`version:${APP_VERSION}`);
+  return session;
+}
+
+function restorePlayerFromStoredData(name, storedData) {
+  const p = createPlayer(name);
+  Object.assign(p, storedData);
+  if (storedData.先天) {
+    p.先天 = storedData.先天;
+    p.maxHp = 100 + storedData.先天.根骨 * 10;
+    p.maxMp = 50 + storedData.先天.经脉 * 5;
+    p.外功攻击 = 10 + storedData.先天.根骨 * 2;
+    p.防御 = 5 + Math.floor(storedData.先天.根骨 / 2);
+    p.身法 = 10 + storedData.先天.悟性;
+    p.命中 = 80 + storedData.先天.悟性 * 2;
+    p.闪避 = 10 + Math.floor(storedData.先天.经脉 / 2);
+    p.暴击 = 5 + Math.floor(storedData.先天.福缘 / 2);
+    p.气血 = p.maxHp;
+    p.内力 = p.maxMp;
+  }
+  p.title = getTitle(p.exp);
+  return p;
 }
 
 const weapons = {
@@ -955,6 +978,11 @@ wss.on('connection', (ws) => {
   ws.on('message', (data) => {
     const input = data.toString().trim();
 
+    if (input.startsWith('/client_version ')) {
+      ws.clientVersion = input.substring('/client_version '.length).trim();
+      return;
+    }
+
     if (state === 'welcome') {
       if (input === '1' || input === 'login') {
         state = 'login';
@@ -1009,6 +1037,9 @@ wss.on('connection', (ws) => {
         onlinePlayers[tempName] = ws;
         state = 'playing';
         
+        reloadUsersFromDb();
+        users[tempName] = db.getUser(tempName) || users[tempName];
+
         // 欢迎消息 + 在线人数 + 运行时间
         const onlineCount = Object.keys(onlinePlayers).length;
         const uptime = getUptime();
@@ -1021,13 +1052,8 @@ wss.on('connection', (ws) => {
         ws.send(welcomeMsg);
         ws.send(formatOutput(player, '欢迎回来，' + tempName + '！'));
         
-        // 生成session token
-        const sessionToken = Math.random().toString(36).substring(2);
-        users[tempName].sessionToken = sessionToken;
-        saveUsers();
-        
-        // 发送session token给客户端（客户端会保存）
-        ws.send('【江湖秘术】' + tempName + '又回到了这个世界~');
+        const session = issueSession(tempName, ws);
+        ws.send('【江湖秘术】' + tempName + '又回到了这个世界~ session:' + session.token);
         
         // 通知关注者
         if (savedData && savedData.follows) {
@@ -1091,6 +1117,7 @@ wss.on('connection', (ws) => {
         questProgress: {}
       };
       saveUsers();
+      reloadUsersFromDb();
       player = newPlayer;
       players[tempName] = player;
       onlinePlayers[tempName] = ws;
@@ -2007,7 +2034,7 @@ wss.on('connection', (ws) => {
               if (!player.achievements.includes('初识危机')) {
                 player.achievements.push('初识危机');
               }
-              saveUsers();
+              saveProgress();
               break;
             }
             if (player.quest === '三体降临' && player.room === '临海新港城·中央科研区') {
@@ -2034,7 +2061,7 @@ wss.on('connection', (ws) => {
               if (!player.achievements.includes('危机入门')) {
                 player.achievements.push('危机入门');
               }
-              saveUsers();
+              saveProgress();
               break;
             }
             // ETO潜伏任务完成
@@ -2062,7 +2089,7 @@ ETO组织正在为"他们"的到来做准备...
               if (!player.achievements.includes('ETO知情者')) {
                 player.achievements.push('ETO知情者');
               }
-              saveUsers();
+              saveProgress();
               break;
             }
             // 深空监听任务完成
@@ -2092,7 +2119,7 @@ ETO组织正在为"他们"的到来做准备...
               if (!player.achievements.includes('面壁者')) {
                 player.achievements.push('面壁者');
               }
-              saveUsers();
+              saveProgress();
               break;
             }
             // 桃花岛任务完成
@@ -2119,7 +2146,7 @@ ETO组织正在为"他们"的到来做准备...
               if (!player.achievements.includes('桃花岛门客')) {
                 player.achievements.push('桃花岛门客');
               }
-              saveUsers();
+              saveProgress();
               break;
             }
             // 凤栖疑云任务完成
@@ -2144,7 +2171,7 @@ ETO组织正在为"他们"的到来做准备...
               if (!player.achievements.includes('凤栖知情者')) {
                 player.achievements.push('凤栖知情者');
               }
-              saveUsers();
+              saveProgress();
               break;
             }
             // 青衣楼阴谋任务完成
@@ -2172,7 +2199,7 @@ ETO组织正在为"他们"的到来做准备...
               if (!player.achievements.includes('青衣楼克星')) {
                 player.achievements.push('青衣楼克星');
               }
-              saveUsers();
+              saveProgress();
               break;
             }
             // 紫禁之战任务完成
@@ -2201,7 +2228,7 @@ ETO组织正在为"他们"的到来做准备...
               if (!player.achievements.includes('紫禁见证者')) {
                 player.achievements.push('紫禁见证者');
               }
-              saveUsers();
+              saveProgress();
               break;
             }
             ws.send(`【当前任务】${player.quest}\n进度: ${JSON.stringify(player.questProgress)}\n>`);
@@ -2229,32 +2256,19 @@ ETO组织正在为"他们"的到来做准备...
             const parts = args.split(' ');
             const reconnectName = parts[0];
             const reconnectToken = parts[1];
-            if (reconnectName && reconnectToken && users[reconnectName] && users[reconnectName].sessionToken === reconnectToken) {
+            const sessionRow = db.getSessionByToken(reconnectToken);
+            const storedUser = db.getUser(reconnectName);
+            if (reconnectName && reconnectToken && sessionRow && storedUser && sessionRow.user_name === reconnectName && sessionRow.status === 'active' && sessionRow.server_version === APP_VERSION) {
+              db.touchSession(reconnectToken, ws.clientVersion || null);
               // 恢复会话
-              player = createPlayer(reconnectName);
-              Object.assign(player, users[reconnectName]);
-              // 确保先天资质不丢失
-              if (users[reconnectName].先天) {
-                player.先天 = users[reconnectName].先天;
-                player.maxHp = 100 + player.先天.根骨 * 10;
-                player.maxMp = 50 + player.先天.经脉 * 5;
-                player.外功攻击 = 10 + player.先天.根骨 * 2;
-                player.防御 = 5 + Math.floor(player.先天.根骨 / 2);
-                player.身法 = 10 + player.先天.悟性;
-                player.命中 = 80 + player.先天.悟性 * 2;
-                player.闪避 = 10 + Math.floor(player.先天.经脉 / 2);
-                player.暴击 = 5 + Math.floor(player.先天.福缘 / 2);
-                player.气血 = player.maxHp;
-                player.内力 = player.maxMp;
-              }
-              player.title = getTitle(player.exp);
+              player = restorePlayerFromStoredData(reconnectName, storedUser);
               players[reconnectName] = player;
               onlinePlayers[reconnectName] = ws;
               state = 'playing';
               // 生成新token
               const newToken = Math.random().toString(36).substring(2);
               users[reconnectName].sessionToken = newToken;
-              saveUsers();
+              saveProgress();
               // 完整欢迎消息
               const onlineCount = Object.keys(onlinePlayers).length;
               const uptime = getUptime();
@@ -2266,7 +2280,7 @@ ETO组织正在为"他们"的到来做准备...
 '╚════════════════════════════════════╝\n';
               ws.send(welcomeMsg2);
               ws.send(formatOutput(player, '欢迎回来，' + reconnectName + '！'));
-              appendOutput('【江湖秘术】' + reconnectName + '又回到了这个世界~', 'system');
+              ws.send('【江湖秘术】' + reconnectName + '又回到了这个世界~ session:' + session.token);
               break;
             } else {
               ws.send('登录已过期，请重新登录。\n>');
@@ -2289,6 +2303,7 @@ ETO组织正在为"他们"的到来做准备...
 输入 decode signal 解码信号
 `);
             player.观测数据 = true;
+            saveProgress();
           } else {
             ws.send('这里无法观测天空。\n>');
           }
@@ -2315,6 +2330,7 @@ ETO组织正在为"他们"的到来做准备...
             player.信号已解码 = true;
             player.questProgress = { step: 2, desc: '已解码信号，前往中央科研区', stage: 'decode' };
             player.已触发新港城剧情 = true;
+            saveProgress();
           } else {
             ws.send('你没有观测数据，需要先 scan sky。\n>');
           }

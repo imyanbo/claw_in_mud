@@ -118,6 +118,10 @@
 </head>
 <body>
   <h1>🏯 武侠世界 MUD</h1>
+  <div style="max-width:900px;margin:0 auto 10px;width:100%;display:flex;justify-content:space-between;gap:10px;align-items:center;color:#9fb3c8;font-size:14px;">
+    <div id="version-badge">版本检查中...</div>
+    <button id="reset-btn" style="padding:8px 12px;border:none;border-radius:4px;background:#444;color:#fff;cursor:pointer;">清缓存重连</button>
+  </div>
   <div id="game-container"></div>
   <div id="input-area">
     <input type="text" id="command-input" placeholder="输入指令..." autocomplete="off">
@@ -130,11 +134,13 @@
     const sendBtn = document.getElementById('send-btn');
     
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let ws;
-    let reconnectAttempts = 0;
-    let heartbeatInterval;
+    const APP_STORAGE_VERSION_KEY = 'mud_app_version';
+    const CLIENT_BUILD = 'dev-2026-03-24-1';
     let sessionToken = localStorage.getItem('mud_session');
     let playerName = localStorage.getItem('mud_player');
+    let serverVersion = null;
+    const versionBadge = document.getElementById('version-badge');
+    const resetBtn = document.getElementById('reset-btn');
     
     // ========== 辅助函数 ==========
     function appendOutput(text, className = '') {
@@ -170,7 +176,48 @@
       container.scrollTop = container.scrollHeight;
     }
 
-    function connect() {
+
+    function clearClientState({ keepVersion = false } = {}) {
+      localStorage.removeItem('mud_session');
+      localStorage.removeItem('mud_player');
+      sessionStorage.clear();
+      if (!keepVersion) localStorage.removeItem(APP_STORAGE_VERSION_KEY);
+      sessionToken = null;
+      playerName = null;
+    }
+
+    async function ensureVersionFresh() {
+      try {
+        const resp = await fetch(`/api/version?t=${Date.now()}`, { cache: 'no-store' });
+        const data = await resp.json();
+        serverVersion = data.serverVersion;
+        versionBadge.textContent = `FE:${CLIENT_BUILD} | BE:${data.serverVersion}`;
+        const storedVersion = localStorage.getItem(APP_STORAGE_VERSION_KEY);
+        if (storedVersion && storedVersion !== data.serverVersion) {
+          appendOutput(`检测到新版本 ${data.serverVersion}，已清理旧会话并刷新。`, 'system');
+          clearClientState({ keepVersion: true });
+          localStorage.setItem(APP_STORAGE_VERSION_KEY, data.serverVersion);
+          setTimeout(() => location.reload(), 300);
+          return false;
+        }
+        localStorage.setItem(APP_STORAGE_VERSION_KEY, data.serverVersion);
+        return true;
+      } catch (err) {
+        versionBadge.textContent = `FE:${CLIENT_BUILD} | BE:检查失败`;
+        appendOutput('版本检查失败，继续尝试连接。', 'error');
+        return true;
+      }
+    }
+
+    resetBtn.addEventListener('click', () => {
+      clearClientState();
+      appendOutput('已清理本地缓存与会话，页面即将刷新。', 'system');
+      setTimeout(() => location.reload(), 300);
+    });
+
+    async function connect() {
+      const ok = await ensureVersionFresh();
+      if (!ok) return;
       ws = new WebSocket(`${protocol}//${location.host}`);
       
       ws.onopen = () => {
@@ -179,7 +226,10 @@
         startHeartbeat();
         // 如果有保存的session，自动恢复登录
         if (sessionToken && playerName) {
+          ws.send(`/client_version ${CLIENT_BUILD}`);
           ws.send('/reconnect ' + playerName + ' ' + sessionToken);
+        } else {
+          ws.send(`/client_version ${CLIENT_BUILD}`);
         }
       };
 
@@ -198,6 +248,14 @@
         } else if (event.data && event.data.startsWith('session:')) {
           const token = event.data.substring(8);
           localStorage.setItem('mud_session', token);
+          sessionToken = token;
+          return;
+        } else if (event.data && event.data.startsWith('version:')) {
+          serverVersion = event.data.substring(8);
+          versionBadge.textContent = `FE:${CLIENT_BUILD} | BE:${serverVersion}`;
+          return;
+        } else if (event.data && (event.data.includes('客户端版本过旧') || event.data.includes('登录已过期'))) {
+          clearClientState({ keepVersion: true });
         }
         appendOutput(event.data);
       };
