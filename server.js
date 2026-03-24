@@ -1122,6 +1122,7 @@ wss.on('connection', (ws) => {
       // 先创建玩家获取先天资质
       const newPlayer = createPlayer(tempName);
       users[tempName] = {
+        name: tempName,
         password: input, exp: 0, level: 1, gold: 50,
         skills: JSON.parse(JSON.stringify(skills)),
         hp: 100, mp: 50,
