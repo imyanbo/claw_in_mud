@@ -962,11 +962,13 @@ wss.on('connection', (ws) => {
         // 欢迎消息 + 在线人数 + 运行时间
         const onlineCount = Object.keys(onlinePlayers).length;
         const uptime = getUptime();
-        ws.send('====================================');
-        ws.send('=== Welcome ' + tempName + ' to Wuxia World! ===');
-        ws.send('Online: ' + onlineCount + ' players');
-        ws.send('Uptime: ' + uptime.days + 'd ' + uptime.hours + 'h ' + uptime.minutes + 'm');
-        ws.send('====================================');
+        const welcomeMsg = '\n╔════════════════════════════════════╗\n' +
+'║   欢迎' + tempName + '登陆武侠世界！         ║\n' +
+'║   当前在线玩家: ' + onlineCount + '人               ║\n' +
+'║   江湖儿女江湖老，一片冰心在玉壶       ║\n' +
+'║   世界已经运行了' + uptime.days + '天' + uptime.hours + '小时' + uptime.minutes + '分钟    ║\n' +
+'╚════════════════════════════════════╝\n';
+        ws.send(welcomeMsg);
         ws.send(formatOutput(player, '欢迎回来，' + tempName + '！'));
         
         // 生成session token
@@ -975,7 +977,7 @@ wss.on('connection', (ws) => {
         saveUsers();
         
         // 发送session token给客户端（客户端会保存）
-        ws.send('[System] ' + tempName + ' returned to this world~');
+        ws.send('【江湖秘术】' + tempName + '又回到了这个世界~');
         
         // 通知关注者
         if (savedData && savedData.follows) {
@@ -2206,13 +2208,15 @@ ETO组织正在为"他们"的到来做准备...
               // 完整欢迎消息
               const onlineCount = Object.keys(onlinePlayers).length;
               const uptime = getUptime();
-              ws.send('====================================');
-              ws.send('=== Welcome ' + reconnectName + ' to Wuxia World! ===');
-              ws.send('Online: ' + onlineCount + ' players');
-              ws.send('Uptime: ' + uptime.days + 'd ' + uptime.hours + 'h ' + uptime.minutes + 'm');
-              ws.send('====================================');
+              const welcomeMsg2 = '\n╔════════════════════════════════════╗\n' +
+'║   欢迎' + reconnectName + '登陆武侠世界！         ║\n' +
+'║   当前在线玩家: ' + onlineCount + '人               ║\n' +
+'║   江湖儿女江湖老，一片冰心在玉壶       ║\n' +
+'║   世界已经运行了' + uptime.days + '天' + uptime.hours + '小时' + uptime.minutes + '分钟    ║\n' +
+'╚════════════════════════════════════╝\n';
+              ws.send(welcomeMsg2);
               ws.send(formatOutput(player, '欢迎回来，' + reconnectName + '！'));
-              appendOutput('[System] ' + reconnectName + ' returned to this world~', 'system');
+              appendOutput('【江湖秘术】' + reconnectName + '又回到了这个世界~', 'system');
               break;
             } else {
               ws.send('登录已过期，请重新登录。\n>');
