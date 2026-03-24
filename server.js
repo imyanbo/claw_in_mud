@@ -2183,6 +2183,21 @@ ETO组织正在为"他们"的到来做准备...
               // 恢复会话
               player = createPlayer(reconnectName);
               Object.assign(player, users[reconnectName]);
+              // 确保先天资质不丢失
+              if (users[reconnectName].先天) {
+                player.先天 = users[reconnectName].先天;
+                player.maxHp = 100 + player.先天.根骨 * 10;
+                player.maxMp = 50 + player.先天.经脉 * 5;
+                player.外功攻击 = 10 + player.先天.根骨 * 2;
+                player.防御 = 5 + Math.floor(player.先天.根骨 / 2);
+                player.身法 = 10 + player.先天.悟性;
+                player.命中 = 80 + player.先天.悟性 * 2;
+                player.闪避 = 10 + Math.floor(player.先天.经脉 / 2);
+                player.暴击 = 5 + Math.floor(player.先天.福缘 / 2);
+                player.气血 = player.maxHp;
+                player.内力 = player.maxMp;
+              }
+              player.title = getTitle(player.exp);
               players[reconnectName] = player;
               onlinePlayers[reconnectName] = ws;
               state = 'playing';
@@ -2190,7 +2205,16 @@ ETO组织正在为"他们"的到来做准备...
               const newToken = Math.random().toString(36).substring(2);
               users[reconnectName].sessionToken = newToken;
               saveUsers();
-              ws.send(`✓ 自动登录成功！欢迎回来，${reconnectName}！\n`);
+              // 完整欢迎消息
+              const onlineCount = Object.keys(onlinePlayers).length;
+              const uptime = getUptime();
+              ws.send(`╔════════════════════════════════════╗
+║   欢迎${reconnectName}登陆武侠世界！         ║
+║   当前在线玩家: ${onlineCount}人               ║
+║   江湖儿女江湖老，一片冰心在玉壶       ║
+║   世界已经运行了${uptime.days}天${uptime.hours}小时${uptime.minutes}分钟    ║
+╚════════════════════════════════════╝
+`);
               ws.send(formatOutput(player, `欢迎回来，${reconnectName}！`));
               appendOutput(`【江湖秘术】${reconnectName}又回到了这个世界~`, 'system');
               break;
