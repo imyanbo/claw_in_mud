@@ -1,0 +1,2192 @@
+{
+  "大鹿": {
+    "password": "123456",
+    "exp": 176,
+    "level": 1,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 185,
+    "mp": 75,
+    "gold": 4,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null,
+    "maxHp": 190,
+    "maxMp": 75,
+    "quest": null,
+    "questProgress": {},
+    "先天": {
+      "根骨": 9,
+      "悟性": 6,
+      "经脉": 5,
+      "福缘": 5
+    },
+    "气血": 190,
+    "内力": 75,
+    "外功攻击": 28,
+    "内功攻击": 0,
+    "防御": 9,
+    "身法": 16,
+    "命中": 92,
+    "闪避": 12,
+    "暴击": 7,
+    "门派声望": 0,
+    "achievements": [],
+    "sessionToken": "6ht5mmkib0b"
+  },
+  "testuser": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null
+  },
+  "tester_mty48l": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": []
+  },
+  "u077o1t": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "testuser003": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "ub6w6lu": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "usjlfwq": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "up37l6q": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test004": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test005": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test006": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test008": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "ucogtdo": {
+    "password": "pass1234",
+    "exp": 13,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uyuhcee": {
+    "password": "pass1234",
+    "exp": 14,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [
+      "testuser",
+      "testuser"
+    ],
+    "master": null,
+    "school": null
+  },
+  "test009": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test010": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test011": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test012": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test013": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test014": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "ubsyq13": {
+    "password": "pass1234",
+    "exp": 11,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [
+      "testuser",
+      "testuser"
+    ],
+    "master": null,
+    "school": null
+  },
+  "test015": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "u96kjkw": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [
+      "testuser"
+    ],
+    "master": null,
+    "school": null
+  },
+  "u6e83ip": {
+    "password": "pass1234",
+    "exp": 24,
+    "level": 1,
+    "gold": 64,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 40,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "testbaishi": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "testbaishi2": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test016": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test017": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test018": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "test019": {
+    "password": "123456",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uz3x1qf": {
+    "password": "pass1234",
+    "exp": 12,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 56,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [
+      "testuser",
+      "testuser"
+    ],
+    "master": null,
+    "school": null
+  },
+  "u5i2uyy": {
+    "password": "pass1234",
+    "exp": 30,
+    "level": 1,
+    "gold": 66,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 90,
+    "mp": 100,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [
+      "testuser"
+    ],
+    "master": null,
+    "school": null
+  },
+  "ugcr6z2": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 200,
+    "mp": 100,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uh46h4z": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 150,
+    "mp": 80,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "u9sqa7r": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 180,
+    "mp": 75,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "ubr3mkn": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 200,
+    "mp": 95,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uiczhix": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 170,
+    "mp": 80,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "ucdo717": {
+    "password": "pass1234",
+    "exp": 116,
+    "level": 1,
+    "gold": 25,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 5,
+    "mp": 80,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uvgqw5k": {
+    "password": "pass1234",
+    "exp": 140,
+    "level": 1,
+    "gold": 46,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      },
+      "易筋经": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 95,
+    "mp": 90,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": "玄慈",
+    "school": "少林寺"
+  },
+  "udafwmx": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 150,
+    "mp": 90,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "ut8qiis": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 200,
+    "mp": 100,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uxlw3da": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 170,
+    "mp": 100,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "ukuuvv7": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 150,
+    "mp": 95,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "ur271dk": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 160,
+    "mp": 90,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uylgq27": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 180,
+    "mp": 75,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uqk1g4t": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 160,
+    "mp": 85,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "ub32a3z": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 200,
+    "mp": 95,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "u7r5323": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 200,
+    "mp": 90,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "u3h5lmf": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 150,
+    "mp": 95,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "u4ql47o": {
+    "password": "pass1234",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 190,
+    "mp": 100,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "u59l9lk": {
+    "password": "pass1234",
+    "exp": 22,
+    "level": 1,
+    "gold": 64,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 75,
+    "mp": 80,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "ui1ztx7": {
+    "password": "pass1234",
+    "exp": 133,
+    "level": 1,
+    "gold": 60,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 10,
+    "mp": 95,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "u6rxquz": {
+    "password": "pass1234",
+    "exp": 131,
+    "level": 1,
+    "gold": 88,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 90,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "u7f8zyh": {
+    "password": "pass1234",
+    "exp": 105,
+    "level": 1,
+    "gold": 92,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 95,
+    "mp": 80,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uw6ewo6": {
+    "password": "pass1234",
+    "exp": 24,
+    "level": 1,
+    "gold": 48,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 75,
+    "mp": 75,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uu3j2db": {
+    "password": "pass1234",
+    "exp": 166,
+    "level": 1,
+    "gold": 131,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 15,
+    "mp": 90,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uawt0q8": {
+    "password": "pass1234",
+    "exp": 43,
+    "level": 1,
+    "gold": 62,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 10,
+    "mp": 100,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uctn076": {
+    "password": "pass1234",
+    "exp": 26,
+    "level": 1,
+    "gold": 43,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 90,
+    "mp": 90,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "urjr0kg": {
+    "password": "pass1234",
+    "exp": 55,
+    "level": 1,
+    "gold": 87,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 40,
+    "mp": 85,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "u51npbo": {
+    "password": "pass1234",
+    "exp": 30,
+    "level": 1,
+    "gold": 54,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 75,
+    "mp": 95,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "u8k2n9v": {
+    "password": "pass1234",
+    "exp": 69,
+    "level": 1,
+    "gold": 5,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 75,
+    "mp": 80,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "uod81n0": {
+    "password": "pass1234",
+    "exp": 73,
+    "level": 1,
+    "gold": 37,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 85,
+    "mp": 95,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null
+  },
+  "ursrtu6": {
+    "password": "pass1234",
+    "exp": 156,
+    "level": 1,
+    "gold": 62,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 75,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null,
+    "先天": {
+      "根骨": 10,
+      "悟性": 6,
+      "经脉": 5,
+      "福缘": 5
+    },
+    "气血": 200,
+    "内力": 75,
+    "外功攻击": 30,
+    "内功攻击": 0,
+    "防御": 10,
+    "身法": 16,
+    "命中": 92,
+    "闪避": 12,
+    "暴击": 7,
+    "maxHp": 200,
+    "maxMp": 75,
+    "门派声望": 0,
+    "achievements": [],
+    "quest": "三体降临",
+    "questProgress": {
+      "step": 1,
+      "desc": "在粒子实验室观测异常数据",
+      "stage": "start"
+    }
+  },
+  "uc0hy1a": {
+    "password": "pass1234",
+    "exp": 43,
+    "level": 1,
+    "gold": 57,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 75,
+    "mp": 95,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null,
+    "先天": {
+      "根骨": 5,
+      "悟性": 10,
+      "经脉": 9,
+      "福缘": 5
+    },
+    "气血": 150,
+    "内力": 95,
+    "外功攻击": 20,
+    "内功攻击": 0,
+    "防御": 7,
+    "身法": 20,
+    "命中": 100,
+    "闪避": 14,
+    "暴击": 7,
+    "maxHp": 150,
+    "maxMp": 95,
+    "门派声望": 0,
+    "achievements": [],
+    "quest": null,
+    "questProgress": {}
+  },
+  "u2kswhr": {
+    "password": "pass1234",
+    "exp": 182,
+    "level": 1,
+    "gold": 129,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 90,
+    "mp": 85,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null,
+    "先天": {
+      "根骨": 8,
+      "悟性": 7,
+      "经脉": 7,
+      "福缘": 5
+    },
+    "气血": 180,
+    "内力": 85,
+    "外功攻击": 26,
+    "内功攻击": 0,
+    "防御": 9,
+    "身法": 17,
+    "命中": 94,
+    "闪避": 13,
+    "暴击": 7,
+    "maxHp": 180,
+    "maxMp": 85,
+    "门派声望": 0,
+    "achievements": [],
+    "quest": "三体降临",
+    "questProgress": {
+      "step": 1,
+      "desc": "在粒子实验室观测异常数据",
+      "stage": "start"
+    },
+    "观测数据": true,
+    "信号已解码": true
+  },
+  "uhys3wb": {
+    "password": "pass1234",
+    "exp": 110,
+    "level": 1,
+    "gold": 89,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 95,
+    "mp": 100,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null,
+    "先天": {
+      "根骨": 9,
+      "悟性": 6,
+      "经脉": 10,
+      "福缘": 6
+    },
+    "气血": 190,
+    "内力": 100,
+    "外功攻击": 28,
+    "内功攻击": 0,
+    "防御": 9,
+    "身法": 16,
+    "命中": 92,
+    "闪避": 15,
+    "暴击": 8,
+    "maxHp": 190,
+    "maxMp": 100,
+    "门派声望": 0,
+    "achievements": [],
+    "quest": "深空监听",
+    "questProgress": {
+      "step": 1,
+      "desc": "前往深空通讯站",
+      "stage": "start"
+    }
+  },
+  "u8924xn": {
+    "password": "pass1234",
+    "exp": 27,
+    "level": 1,
+    "gold": 51,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 75,
+    "mp": 90,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null,
+    "先天": {
+      "根骨": 5,
+      "悟性": 9,
+      "经脉": 8,
+      "福缘": 10
+    },
+    "气血": 150,
+    "内力": 90,
+    "外功攻击": 20,
+    "内功攻击": 0,
+    "防御": 7,
+    "身法": 19,
+    "命中": 98,
+    "闪避": 14,
+    "暴击": 10,
+    "maxHp": 150,
+    "maxMp": 90,
+    "门派声望": 0,
+    "achievements": [],
+    "quest": null,
+    "questProgress": {}
+  },
+  "register": {
+    "password": "MUD88888",
+    "exp": 32,
+    "level": 1,
+    "gold": 42,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 80,
+    "mp": 95,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null,
+    "先天": {
+      "根骨": 6,
+      "悟性": 9,
+      "经脉": 9,
+      "福缘": 8
+    },
+    "气血": 160,
+    "内力": 95,
+    "外功攻击": 22,
+    "内功攻击": 0,
+    "防御": 8,
+    "身法": 19,
+    "命中": 98,
+    "闪避": 14,
+    "暴击": 9,
+    "maxHp": 160,
+    "maxMp": 95,
+    "门派声望": 0,
+    "achievements": [],
+    "quest": null,
+    "questProgress": {}
+  },
+  "specuu4jg": {
+    "password": "MUD88888",
+    "exp": 246,
+    "level": 1,
+    "gold": 92,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      },
+      "落英神掌": {
+        "level": 1,
+        "exp": 0
+      },
+      "弹指神通": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 15,
+    "mp": 100,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": "黄药师",
+    "school": "桃花岛",
+    "先天": {
+      "根骨": 8,
+      "悟性": 9,
+      "经脉": 10,
+      "福缘": 7
+    },
+    "气血": 180,
+    "内力": 100,
+    "外功攻击": 26,
+    "内功攻击": 0,
+    "防御": 9,
+    "身法": 19,
+    "命中": 98,
+    "闪避": 15,
+    "暴击": 8,
+    "maxHp": 180,
+    "maxMp": 100,
+    "门派声望": 0,
+    "achievements": [
+      "危机入门"
+    ],
+    "quest": "凤栖疑云",
+    "questProgress": {
+      "step": 1,
+      "desc": "前往凤栖城",
+      "stage": "start"
+    }
+  },
+  "to6sso": {
+    "password": "MUD88888",
+    "exp": 0,
+    "level": 1,
+    "gold": 50,
+    "skills": {
+      "基本内功": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本拳法": {
+        "level": 1,
+        "exp": 0
+      },
+      "基本轻功": {
+        "level": 1,
+        "exp": 0
+      }
+    },
+    "hp": 100,
+    "mp": 50,
+    "inventory": [],
+    "weapon": null,
+    "armor": null,
+    "follows": [],
+    "master": null,
+    "school": null,
+    "先天": {
+      "根骨": 10,
+      "悟性": 6,
+      "经脉": 10,
+      "福缘": 8
+    },
+    "气血": 200,
+    "内力": 100,
+    "外功攻击": 30,
+    "内功攻击": 0,
+    "防御": 10,
+    "身法": 16,
+    "命中": 92,
+    "闪避": 15,
+    "暴击": 9,
+    "maxHp": 200,
+    "maxMp": 100,
+    "门派声望": 0,
+    "achievements": [],
+    "quest": null,
+    "questProgress": {}
+  }
+}

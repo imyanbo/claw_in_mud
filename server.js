@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const fs = require('fs');
+const db = require('./db');
 
 const app = express();
 const server = http.createServer(app);
@@ -32,8 +33,57 @@ try {
   console.log('无法读取用户数据');
 }
 
+// Load from SQLite if database exists
+try {
+  const Database = require('better-sqlite3');
+  const sqldb = new Database('./mud.db');
+  const rows = sqldb.prepare('SELECT * FROM users').all();
+  for (const row of rows) {
+    if (!users[row.name]) {
+      users[row.name] = {
+        ...row,
+        skills: JSON.parse(row.skills || '{}'),
+        inventory: JSON.parse(row.inventory || '[]'),
+        follows: JSON.parse(row.follows || '[]'),
+        questProgress: JSON.parse(row.questProgress || '{}'),
+        achievements: JSON.parse(row.achievements || '[]'),
+        先天: JSON.parse(row.先天 || '{}')
+      };
+    }
+  }
+  sqldb.close();
+  console.log('Loaded users from SQLite:', Object.keys(users).length);
+} catch (e) {
+  console.log('SQLite not available, using JSON only');
+}
+
 function saveUsers() {
   fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
+  
+  // Also save to SQLite
+  try {
+    const Database = require('better-sqlite3');
+    const sqldb = new Database('./mud.db');
+    const stmt = sqldb.prepare(`
+      INSERT OR REPLACE INTO users (name, password, exp, level, gold, hp, mp, maxHp, maxMp, room, skills, inventory, weapon, armor, title, follows, master, school, quest, questProgress, achievements, sessionToken, 先天, 气血, 内力, 外功攻击, 内功攻击, 防御, 身法, 命中, 闪避, 暴击, 门派声望)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const [name, user] of Object.entries(users)) {
+      stmt.run(
+        user.name || name, user.password, user.exp || 0, user.level || 1, user.gold || 50,
+        user.hp || 100, user.mp || 50, user.maxHp || 100, user.maxMp || 50, user.room || '客栈',
+        JSON.stringify(user.skills || {}), JSON.stringify(user.inventory || []), user.weapon, user.armor,
+        user.title || '初入江湖', JSON.stringify(user.follows || []), user.master, user.school,
+        user.quest, JSON.stringify(user.questProgress || {}), JSON.stringify(user.achievements || []),
+        user.sessionToken || null, JSON.stringify(user.先天 || {}),
+        user.气血 || 100, user.内力 || 50, user.外功攻击 || 10, user.内功攻击 || 0,
+        user.防御 || 5, user.身法 || 10, user.命中 || 80, user.闪避 || 10, user.暴击 || 5, user.门派声望 || 0
+      );
+    }
+    sqldb.close();
+  } catch (e) {
+    // SQLite save failed, JSON backup is still available
+  }
 }
 
 const weapons = {
