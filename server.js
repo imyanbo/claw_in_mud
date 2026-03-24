@@ -3,6 +3,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const fs = require('fs');
 const crypto = require('crypto');
+const os = require('os');
 const db = require('./db');
 
 const app = express();
@@ -25,6 +26,7 @@ db.initDatabase();
 db.invalidateAllSessionsForVersionMismatch();
 
 const APP_VERSION = db.APP_VERSION;
+const INSTANCE_ID = `${os.hostname()}-${process.pid}`;
 
 app.get('/api/version', (req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -87,6 +89,23 @@ function issueSession(userName, ws) {
   ws.send(`session:${session.token}`);
   ws.send(`version:${APP_VERSION}`);
   return session;
+}
+
+function markPlayerOnline(player, ws) {
+  db.upsertOnlinePresence({
+    userName: player.name,
+    instanceId: INSTANCE_ID,
+    room: player.room,
+    clientType: ws.clientVersion ? 'lobster' : 'browser'
+  });
+}
+
+function markPlayerHeartbeat(player) {
+  db.touchOnlinePresence(player.name, player.room);
+}
+
+function markPlayerOffline(player) {
+  db.removeOnlinePresence(player.name);
 }
 
 function restorePlayerFromStoredData(name, storedData) {
@@ -980,6 +999,7 @@ wss.on('connection', (ws) => {
       }
       delete players[player.name];
       if (onlinePlayers[player.name]) delete onlinePlayers[player.name];
+      markPlayerOffline(player);
     }
   });
 
@@ -1044,6 +1064,7 @@ wss.on('connection', (ws) => {
         players[tempName] = player;
         onlinePlayers[tempName] = ws;
         state = 'playing';
+        markPlayerOnline(player, ws);
         
         reloadUsersFromDb();
         users[tempName] = db.getUser(tempName) || users[tempName];
@@ -1130,6 +1151,7 @@ wss.on('connection', (ws) => {
       players[tempName] = player;
       onlinePlayers[tempName] = ws;
       state = 'playing';
+      markPlayerOnline(player, ws);
       console.log(`[注册] ${tempName} 注册成功`);
       // 注册欢迎消息 + 在线人数
       const onlineCount = Object.keys(onlinePlayers).length;
@@ -1151,6 +1173,7 @@ wss.on('connection', (ws) => {
 
       function saveProgress() {
         if (users[player.name]) {
+          markPlayerHeartbeat(player);
           // 保存所有玩家数据
           Object.assign(users[player.name], {
             // 基本属性
@@ -1563,13 +1586,14 @@ wss.on('connection', (ws) => {
         case 'players':
         case 'online':
           let whoMsg = '\n【在线玩家】\n';
-          const onlineList = Object.keys(players);
+          const onlineList = db.listOnlinePlayers();
           if (onlineList.length === 0) {
             whoMsg += '当前没有其他玩家在线\n';
           } else {
-            for (const name of onlineList) {
-              if (name !== player.name) {
-                whoMsg += `【${name}】${players[name].title} 在${players[name].room}\n`;
+            for (const online of onlineList) {
+              if (online.user_name !== player.name) {
+                const title = users[online.user_name]?.title || '江湖人士';
+                whoMsg += `【${online.user_name}】${title} 在${online.room || '未知地点'}\n`;
               }
             }
             whoMsg += `共 ${onlineList.length} 人在线\n`;
@@ -2275,6 +2299,7 @@ ETO组织正在为"他们"的到来做准备...
               players[reconnectName] = player;
               onlinePlayers[reconnectName] = ws;
               state = 'playing';
+              markPlayerOnline(player, ws);
               // 生成新token
               const newToken = Math.random().toString(36).substring(2);
               users[reconnectName].sessionToken = newToken;

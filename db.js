@@ -8,6 +8,7 @@ db.pragma('foreign_keys = ON');
 
 const APP_VERSION = process.env.APP_VERSION || 'dev-2026-03-24-1';
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MS || 7 * 24 * 60 * 60 * 1000);
+const ONLINE_TTL_MS = Number(process.env.ONLINE_TTL_MS || 90 * 1000);
 
 const serialize = (obj, fallback = {}) => JSON.stringify(obj ?? fallback);
 const deserialize = (str, fallback) => {
@@ -92,6 +93,19 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_sessions_user_name ON sessions(user_name);
     CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
     CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+
+    CREATE TABLE IF NOT EXISTS online_presence (
+      user_name TEXT PRIMARY KEY,
+      instance_id TEXT NOT NULL,
+      connected_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL,
+      room TEXT,
+      client_type TEXT,
+      FOREIGN KEY (user_name) REFERENCES users(name) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_online_presence_instance_id ON online_presence(instance_id);
+    CREATE INDEX IF NOT EXISTS idx_online_presence_last_seen_at ON online_presence(last_seen_at);
   `);
 }
 
@@ -298,6 +312,38 @@ function invalidateAllSessionsForVersionMismatch() {
   db.prepare("UPDATE sessions SET status = 'version_mismatch' WHERE server_version <> ? AND status = 'active'").run(APP_VERSION);
 }
 
+function cleanupOnlinePresence() {
+  const cutoff = new Date(Date.now() - ONLINE_TTL_MS).toISOString();
+  db.prepare('DELETE FROM online_presence WHERE last_seen_at < ?').run(cutoff);
+}
+
+function upsertOnlinePresence({ userName, instanceId, room, clientType }) {
+  const now = nowIso();
+  db.prepare(`
+    INSERT INTO online_presence (user_name, instance_id, connected_at, last_seen_at, room, client_type)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_name) DO UPDATE SET
+      instance_id=excluded.instance_id,
+      last_seen_at=excluded.last_seen_at,
+      room=excluded.room,
+      client_type=excluded.client_type
+  `).run(userName, instanceId, now, now, room || null, clientType || null);
+}
+
+function touchOnlinePresence(userName, room) {
+  db.prepare('UPDATE online_presence SET last_seen_at = ?, room = COALESCE(?, room) WHERE user_name = ?')
+    .run(nowIso(), room || null, userName);
+}
+
+function removeOnlinePresence(userName) {
+  db.prepare('DELETE FROM online_presence WHERE user_name = ?').run(userName);
+}
+
+function listOnlinePlayers() {
+  cleanupOnlinePresence();
+  return db.prepare('SELECT * FROM online_presence ORDER BY connected_at ASC').all();
+}
+
 module.exports = {
   db,
   APP_VERSION,
@@ -312,5 +358,11 @@ module.exports = {
   getSessionByToken,
   touchSession,
   revokeSessionsForUser,
-  invalidateAllSessionsForVersionMismatch
+  invalidateAllSessionsForVersionMismatch,
+  cleanupOnlinePresence,
+  upsertOnlinePresence,
+  touchOnlinePresence,
+  removeOnlinePresence,
+  listOnlinePlayers,
+  ONLINE_TTL_MS
 };
