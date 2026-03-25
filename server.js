@@ -947,12 +947,52 @@ function getTitle(exp) {
   return titles[0].title;
 }
 
+// 生成玩家HP状态描述
+function getHpStatus(hp, maxHp) {
+  const percent = Math.round((hp / maxHp) * 100);
+  if (percent >= 80) return "神采奕奕";
+  if (percent >= 60) return "气定神闲";
+  if (percent >= 40) return "略显疲惫";
+  if (percent >= 20) return "无精打采";
+  if (percent >= 10) return "摇摇欲坠";
+  return "奄奄一息";
+}
+
+// 生成玩家描述
+function getPlayerDescription(targetPlayer) {
+  const p = targetPlayer;
+  
+  // 容貌描述
+  const 容貌描述 = p.先天 && p.先天.根骨 ? 
+    (p.先天.根骨 >= 9 ? "容貌俊美" : p.先天.根骨 >= 7 ? "面貌端正" : "其貌不扬") :
+    "面貌普通";
+  
+  // 衣着描述
+  const 衣着 = p.armor ? `身着${p.armor}` : "衣着朴素";
+  
+  // 装备描述
+  const 武器 = p.weapon ? `手持${p.weapon}` : "空着手";
+  
+  // 气血状态
+  const 状态 = getHpStatus(p.hp, p.maxHp);
+  
+  // 职位描述
+  const 职位 = p.title || "江湖人士";
+  
+  return `${p.name}，${容貌描述}，${衣着}，${武器}。\n${职位}，${状态}。`;
+}
+
 function formatOutput(player, message) {
   let output = `\n=== ${message} ===\n\n`;
   const room = getRoom(player.room);
   if (room) {
     output += room.description + '\n';
     output += `\n出口: ${Object.keys(room.exits).join('、')}\n`;
+    // 显示同房间的其他玩家
+    const playersInRoom = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
+    if (playersInRoom.length > 0) {
+      output += `你看到: ${playersInRoom.map(p => `${p.name}${getHpStatus(p.hp, p.maxHp)}走了过来`).join('、')}\n`;
+    }
     if (room.npcs.length > 0) {
       output += `你看到: ${room.npcs.join('、')}\n`;
     }
@@ -1221,7 +1261,17 @@ wss.on('connection', (ws) => {
       switch (cmd) {
         case 'look':
         case 'l':
-          ws.send(formatOutput(player, player.room));
+          // 查看其他玩家
+          if (args) {
+            const target = Object.values(players).find(p => p.name === args && p.room === player.room);
+            if (target) {
+              ws.send('\n' + getPlayerDescription(target) + '\n>');
+            } else {
+              ws.send('这里没有这个玩家。\n>');
+            }
+          } else {
+            ws.send(formatOutput(player, player.room));
+          }
           break;
         
         case 'go':
