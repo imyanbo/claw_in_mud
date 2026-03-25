@@ -1301,7 +1301,7 @@ wss.on('connection', (ws) => {
         case 'hp':
         case 'status':
         case '状态':
-          ws.send(formatOutputBrief(player, player.room));
+          ws.send(formatOutput(player, player.room));
           break;
         
         case 'go':
@@ -1371,15 +1371,15 @@ wss.on('connection', (ws) => {
           if (player.room === '扬州码头') {
             player.room = '远洋客轮甲板';
             saveProgress();
-            ws.send('你登上了远洋客轮...\n\n' + formatOutput(player, player.room));
+            ws.send('你登上了远洋客轮...\n\n' + formatOutputBrief(player, player.room));
           } else if (player.room === '枫林渡口') {
             player.room = '凤栖城码头';
             saveProgress();
-            ws.send('你登上渡船，前往凤栖城...\n\n' + formatOutput(player, player.room));
+            ws.send('你登上渡船，前往凤栖城...\n\n' + formatOutputBrief(player, player.room));
           } else if (args === 'ship' && player.room === '扬州码头') {
             player.room = '远洋客轮甲板';
             saveProgress();
-            ws.send('你登上了远洋客轮...\n\n' + formatOutput(player, player.room));
+            ws.send('你登上了远洋客轮...\n\n' + formatOutputBrief(player, player.room));
           } else {
             ws.send('这里没有船可以登。\n>');
           }
@@ -1388,21 +1388,21 @@ wss.on('connection', (ws) => {
         case 'n':
         case 'north':
         case '北':
-          if (movePlayer(player, '北')) { saveProgress(); ws.send(formatOutput(player, '你向北走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('北边没有路。可用: ' + exits); } break;
+          if (movePlayer(player, '北')) { saveProgress(); ws.send(formatOutputBrief(player, '你向北走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('北边没有路。可用: ' + exits); } break;
         case 's':
         case 'south':
         case '南':
-          if (movePlayer(player, '南')) { saveProgress(); ws.send(formatOutput(player, '你向南走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('南边没有路。可用: ' + exits); } break;
+          if (movePlayer(player, '南')) { saveProgress(); ws.send(formatOutputBrief(player, '你向南走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('南边没有路。可用: ' + exits); } break;
         case 'e':
         case 'east':
         case '东':
-          if (movePlayer(player, '东')) { saveProgress(); ws.send(formatOutput(player, '你向东走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('东边没有路。可用: ' + exits); } break;
+          if (movePlayer(player, '东')) { saveProgress(); ws.send(formatOutputBrief(player, '你向东走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('东边没有路。可用: ' + exits); } break;
         case 'w':
         case 'west':
         case '西':
-          if (movePlayer(player, '西')) { saveProgress(); ws.send(formatOutput(player, '你向西走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('西边没有路。可用: ' + exits); } break;
-        case 'u': if (movePlayer(player, '上')) { saveProgress(); ws.send(formatOutput(player, '你向上走去')); } else ws.send('上面没有路。'); break;
-        case 'd': if (movePlayer(player, '下')) { saveProgress(); ws.send(formatOutput(player, '你向下走去')); } else ws.send('下面没有路。'); break;
+          if (movePlayer(player, '西')) { saveProgress(); ws.send(formatOutputBrief(player, '你向西走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('西边没有路。可用: ' + exits); } break;
+        case 'u': if (movePlayer(player, '上')) { saveProgress(); ws.send(formatOutputBrief(player, '你向上走去')); } else ws.send('上面没有路。'); break;
+        case 'd': if (movePlayer(player, '下')) { saveProgress(); ws.send(formatOutputBrief(player, '你向下走去')); } else ws.send('下面没有路。'); break;
 
         case 'skills':
           // 查看指定师父的技能
@@ -1558,22 +1558,19 @@ wss.on('connection', (ws) => {
         case 'fight':
           // 检查是否有指定对手
           if (args) {
-            // 玩家之间的战斗
+            // 先检查是否是同房间的玩家
             const target = Object.values(players).find(p => p.name === args && p.room === player.room && p.name !== player.name);
-            if (!target) {
-              ws.send('这里没有 ' + args + ' 这个玩家。\n>');
-              break;
-            }
-            
-            const playerAtk = 10 + (player.weapon ? weapons[player.weapon].damage : 0);
-            const targetAtk = 10 + (target.weapon ? weapons[target.weapon].damage : 0);
-            
-            const attackPhrases = [
-              '大喝一声', '身形疾进', '招式凌厉', '掌风呼呼', '剑光闪闪',
-              '真气激荡', '功力运足', '身形晃动', '攻势如潮', '招式精妙'
-            ];
-            
-            let combatLog = `
+            if (target) {
+              // 玩家之间的战斗
+              const playerAtk = 10 + (player.weapon ? weapons[player.weapon].damage : 0);
+              const targetAtk = 10 + (target.weapon ? weapons[target.weapon].damage : 0);
+              
+              const attackPhrases = [
+                '大喝一声', '身形疾进', '招式凌厉', '掌风呼呼', '剑光闪闪',
+                '真气激荡', '功力运足', '身形晃动', '攻势如潮', '招式精妙'
+              ];
+              
+              let combatLog = `
 ╔══════════════════════════════════════╗
 ║         ⚔️  ${player.name} VS ${target.name}  ⚔️          ║
 ╚══════════════════════════════════════╝
@@ -1583,39 +1580,39 @@ wss.on('connection', (ws) => {
 
 ───────────────────────────────────────
 `;
-            let tHp = target.hp;
-            let round = 1;
-            
-            while (tHp > 0 && player.hp > 0) {
-              const dmg = Math.max(1, playerAtk + Math.floor(Math.random() * 10) - 5);
-              tHp -= dmg;
-              const phrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
-              combatLog += `第${round}招 │ ${player.name} ${phrase}，击中${target.name}！-${dmg}HP\n`;
+              let tHp = target.hp;
+              let round = 1;
               
-              if (tHp <= 0) break;
+              while (tHp > 0 && player.hp > 0) {
+                const dmg = Math.max(1, playerAtk + Math.floor(Math.random() * 10) - 5);
+                tHp -= dmg;
+                const phrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
+                combatLog += `第${round}招 │ ${player.name} ${phrase}，击中${target.name}！-${dmg}HP\n`;
+                
+                if (tHp <= 0) break;
+                
+                const eDmg = Math.max(1, targetAtk + Math.floor(Math.random() * 10) - 5);
+                player.hp -= eDmg;
+                const ePhrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
+                combatLog += `第${round}招 │ ${target.name} ${ePhrase}，击中${player.name}！-${eDmg}HP\n`;
+                
+                combatLog += `        │ ${player.name} HP:${Math.max(0, player.hp)}/${player.maxHp}  ${target.name} HP:${Math.max(0, tHp)}/${target.maxHp}\n`;
+                combatLog += `───────────────────────────────────────\n`;
+                round++;
+              }
               
-              const eDmg = Math.max(1, targetAtk + Math.floor(Math.random() * 10) - 5);
-              player.hp -= eDmg;
-              const ePhrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
-              combatLog += `第${round}招 │ ${target.name} ${ePhrase}，击中${player.name}！-${eDmg}HP\n`;
+              // 更新目标玩家属性
+              target.hp = Math.max(1, tHp);
               
-              combatLog += `        │ ${player.name} HP:${Math.max(0, player.hp)}/${player.maxHp}  ${target.name} HP:${Math.max(0, tHp)}/${target.maxHp}\n`;
-              combatLog += `───────────────────────────────────────\n`;
-              round++;
-            }
-            
-            // 更新目标玩家属性
-            target.hp = Math.max(1, tHp);
-            
-            if (player.hp > 0) {
-              const goldGain = 20 + Math.floor(Math.random() * 30);
-              const expGain = 30 + Math.floor(Math.random() * 20);
-              player.gold += goldGain;
-              player.exp += expGain;
-              const oldTitle = player.title;
-              player.title = getTitle(player.exp);
-              let titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
-              combatLog += `
+              if (player.hp > 0) {
+                const goldGain = 20 + Math.floor(Math.random() * 30);
+                const expGain = 30 + Math.floor(Math.random() * 20);
+                player.gold += goldGain;
+                player.exp += expGain;
+                const oldTitle = player.title;
+                player.title = getTitle(player.exp);
+                let titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
+                combatLog += `
 ╔══════════════════════════════════════╗
 ║           🏆 战斗胜利  🏆              ║
 ╠══════════════════════════════════════╣
@@ -1625,9 +1622,9 @@ wss.on('connection', (ws) => {
 ║  当前经验: ${player.exp}                     ║
 ╚══════════════════════════════════════╝${titleMsg}
 `;
-              saveProgress();
-            } else {
-              combatLog += `
+                saveProgress();
+              } else {
+                combatLog += `
 ╔══════════════════════════════════════╗
 ║           💀 战斗落败  💀              ║
 ╠══════════════════════════════════════╣
@@ -1635,12 +1632,14 @@ wss.on('connection', (ws) => {
 ║  损失金币: 10                       ║
 ╚══════════════════════════════════════╝
 `;
-              player.gold = Math.max(0, player.gold - 10);
-              player.hp = Math.floor(player.maxHp / 2);
-              saveProgress();
+                player.gold = Math.max(0, player.gold - 10);
+                player.hp = Math.floor(player.maxHp / 2);
+                saveProgress();
+              }
+              ws.send(combatLog + '\n>');
+              break;
             }
-            ws.send(combatLog + '\n>');
-            break;
+            // 如果指定了对手但不是在线玩家，继续执行NPC战斗
           }
           
           // 原有的NPC战斗
