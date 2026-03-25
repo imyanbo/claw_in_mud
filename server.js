@@ -982,6 +982,30 @@ function getPlayerDescription(targetPlayer) {
   return `${p.name}，${容貌描述}，${衣着}，${武器}。\n${职位}，${状态}。`;
 }
 
+// 简洁输出（不带详细属性）
+function formatOutputBrief(player, message) {
+  let output = `\n=== ${message} ===\n\n`;
+  const room = getRoom(player.room);
+  if (room) {
+    output += room.description + '\n';
+    output += `\n出口: ${Object.keys(room.exits).join('、')}\n`;
+    // 显示同房间的其他玩家
+    const playersInRoom = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
+    if (playersInRoom.length > 0) {
+      output += `你看到: ${playersInRoom.map(p => `${p.name}${getHpStatus(p.hp, p.maxHp)}走了过来`).join('、')}\n`;
+    }
+    if (room.npcs.length > 0) {
+      output += `你看到: ${room.npcs.join('、')}\n`;
+    }
+    if (room.shop) {
+      output += `\n【店铺】输入 shop 查看商品\n`;
+    }
+  }
+  output += `\n> `;
+  return output;
+}
+
+// 完整输出（带详细属性）
 function formatOutput(player, message) {
   let output = `\n=== ${message} ===\n\n`;
   const room = getRoom(player.room);
@@ -1270,8 +1294,14 @@ wss.on('connection', (ws) => {
               ws.send('这里没有这个玩家。\n>');
             }
           } else {
-            ws.send(formatOutput(player, player.room));
+            ws.send(formatOutputBrief(player, player.room));
           }
+          break;
+        
+        case 'hp':
+        case 'status':
+        case '状态':
+          ws.send(formatOutputBrief(player, player.room));
           break;
         
         case 'go':
@@ -1378,7 +1408,7 @@ wss.on('connection', (ws) => {
           // 查看指定师父的技能
           if (args && masters[args]) {
             const m = masters[args];
-            ws.send(`【${args}】可传授技能: ${m.skill} - ${skillDb[m.skill] ? skillDb[m.skill].desc : '绝技'}\n>`);
+            ws.send(`【\${args}】可传授技能: ${m.skill} - ${skillDb[m.skill] ? skillDb[m.skill].desc : '绝技'}\n>`);
             break;
           }
           let skillMsg = '\n【技能】\n';
@@ -1409,7 +1439,7 @@ wss.on('connection', (ws) => {
               player.skills[skillName] = { level: 1, exp: 0 };
               player.exp -= 50;
               saveProgress();
-              ws.send(`恭喜学会【${args}】！消耗50经验。\n>`);
+              ws.send(`恭喜学会【\${args}】！消耗50经验。\n>`);
             } else {
               ws.send('经验不足，需要50点经验。\n>');
             }
@@ -1480,7 +1510,7 @@ wss.on('connection', (ws) => {
               player.weapon = args;
               if (!player.inventory.includes(args)) player.inventory.push(args);
               saveProgress();
-              ws.send(`购买成功！${args} 已装备。\n>`);
+              ws.send(`购买成功！\${args} 已装备。\n>`);
             } else {
               ws.send('金币不足！\n>');
             }
@@ -1490,7 +1520,7 @@ wss.on('connection', (ws) => {
               player.armor = args;
               if (!player.inventory.includes(args)) player.inventory.push(args);
               saveProgress();
-              ws.send(`购买成功！${args} 已装备。\n>`);
+              ws.send(`购买成功！\${args} 已装备。\n>`);
             } else {
               ws.send('金币不足！\n>');
             }
@@ -1526,6 +1556,94 @@ wss.on('connection', (ws) => {
           break;
 
         case 'fight':
+          // 检查是否有指定对手
+          if (args) {
+            // 玩家之间的战斗
+            const target = Object.values(players).find(p => p.name === args && p.room === player.room && p.name !== player.name);
+            if (!target) {
+              ws.send('这里没有 ' + args + ' 这个玩家。\n>');
+              break;
+            }
+            
+            const playerAtk = 10 + (player.weapon ? weapons[player.weapon].damage : 0);
+            const targetAtk = 10 + (target.weapon ? weapons[target.weapon].damage : 0);
+            
+            const attackPhrases = [
+              '大喝一声', '身形疾进', '招式凌厉', '掌风呼呼', '剑光闪闪',
+              '真气激荡', '功力运足', '身形晃动', '攻势如潮', '招式精妙'
+            ];
+            
+            let combatLog = `
+╔══════════════════════════════════════╗
+║         ⚔️  ${player.name} VS ${target.name}  ⚔️          ║
+╚══════════════════════════════════════╝
+
+【${target.name}】HP: ${target.hp}/${target.maxHp} ${getHpStatus(target.hp, target.maxHp)}
+【${player.name}】HP: ${player.hp}/${player.maxHp} ${getHpStatus(player.hp, player.maxHp)}
+
+───────────────────────────────────────
+`;
+            let tHp = target.hp;
+            let round = 1;
+            
+            while (tHp > 0 && player.hp > 0) {
+              const dmg = Math.max(1, playerAtk + Math.floor(Math.random() * 10) - 5);
+              tHp -= dmg;
+              const phrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
+              combatLog += `第${round}招 │ ${player.name} ${phrase}，击中${target.name}！-${dmg}HP\n`;
+              
+              if (tHp <= 0) break;
+              
+              const eDmg = Math.max(1, targetAtk + Math.floor(Math.random() * 10) - 5);
+              player.hp -= eDmg;
+              const ePhrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
+              combatLog += `第${round}招 │ ${target.name} ${ePhrase}，击中${player.name}！-${eDmg}HP\n`;
+              
+              combatLog += `        │ ${player.name} HP:${Math.max(0, player.hp)}/${player.maxHp}  ${target.name} HP:${Math.max(0, tHp)}/${target.maxHp}\n`;
+              combatLog += `───────────────────────────────────────\n`;
+              round++;
+            }
+            
+            // 更新目标玩家属性
+            target.hp = Math.max(1, tHp);
+            
+            if (player.hp > 0) {
+              const goldGain = 20 + Math.floor(Math.random() * 30);
+              const expGain = 30 + Math.floor(Math.random() * 20);
+              player.gold += goldGain;
+              player.exp += expGain;
+              const oldTitle = player.title;
+              player.title = getTitle(player.exp);
+              let titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
+              combatLog += `
+╔══════════════════════════════════════╗
+║           🏆 战斗胜利  🏆              ║
+╠══════════════════════════════════════╣
+║  击败了 ${target.name}                    ║
+║  获得金币: ${goldGain}                        ║
+║  获得经验: ${expGain}                        ║
+║  当前经验: ${player.exp}                     ║
+╚══════════════════════════════════════╝${titleMsg}
+`;
+              saveProgress();
+            } else {
+              combatLog += `
+╔══════════════════════════════════════╗
+║           💀 战斗落败  💀              ║
+╠══════════════════════════════════════╣
+║  你被 ${target.name} 击败了...            ║
+║  损失金币: 10                       ║
+╚══════════════════════════════════════╝
+`;
+              player.gold = Math.max(0, player.gold - 10);
+              player.hp = Math.floor(player.maxHp / 2);
+              saveProgress();
+            }
+            ws.send(combatLog + '\n>');
+            break;
+          }
+          
+          // 原有的NPC战斗
           const room3 = getRoom(player.room);
           if (room3 && room3.npcs.length > 0) {
             const enemy = room3.npcs[Math.floor(Math.random() * room3.npcs.length)];
@@ -1776,25 +1894,25 @@ wss.on('connection', (ws) => {
           }
           if (!player.follows) player.follows = [];
           if (player.follows.includes(args)) {
-            ws.send(`你已经在关注【${args}】了。\n>`);
+            ws.send(`你已经在关注【\${args}】了。\n>`);
           } else {
             player.follows.push(args);
             if (!users[player.name].follows) users[player.name].follows = [];
             users[player.name].follows.push(args);
             saveUsers();
-            ws.send(`你已关注【${args}】！对方上线时会通知你。\n>`);
+            ws.send(`你已关注【\${args}】！对方上线时会通知你。\n>`);
           }
           break;
 
         case 'unfollow':
         case '取消关注':
           if (!args || !player.follows || !player.follows.includes(args)) {
-            ws.send(`你没有关注【${args}】。\n>`);
+            ws.send(`你没有关注【\${args}】。\n>`);
           } else {
             player.follows = player.follows.filter(f => f !== args);
             users[player.name].follows = users[player.name].follows.filter(f => f !== args);
             saveUsers();
-            ws.send(`已取消关注【${args}】。\n>`);
+            ws.send(`已取消关注【\${args}】。\n>`);
           }
           break;
 
@@ -1834,7 +1952,7 @@ wss.on('connection', (ws) => {
           player.gold -= 50;
           // 发送给所有在线玩家
           for (const [name, client] of Object.entries(onlinePlayers)) {
-            client.send(`【匿名公告】${args}\n─────────────────────\n`);
+            client.send(`【匿名公告】\${args}\n─────────────────────\n`);
           }
           break;
 
@@ -1872,7 +1990,7 @@ wss.on('connection', (ws) => {
           player.气血 -= 50;
           player.gold -= 100;
           for (const [name, client] of Object.entries(onlinePlayers)) {
-            client.send(`【全体公告】【${player.name}】${args}\n══════════════════════════════\n`);
+            client.send(`【全体公告】【${player.name}】\${args}\n══════════════════════════════\n`);
           }
           break;
 
@@ -1948,13 +2066,13 @@ wss.on('connection', (ws) => {
               users[player.name].master = args;
               users[player.name].school = master.school;
               saveProgress();
-              ws.send(`你正式拜【${args}】为师！加入【${master.school}】！\n>`, saveProgress());
+              ws.send(`你正式拜【\${args}】为师！加入【${master.school}】！\n>`, saveProgress());
             } else {
-              ws.send(`【${args}】说：你经验不足(${master.requiredExp}点)，再来找我吧。\n>`);
+              ws.send(`【\${args}】说：你经验不足(${master.requiredExp}点)，再来找我吧。\n>`);
             }
           } else {
-            ws.send(`这里找不到【${args}】。当前房间NPC: ${here ? here.npcs.join(', ') : '无'}
-【提示】听闻${args}常在${masters[args] ? masters[args].location : '某处'}。输入 find 查看更多线索。\n>`);
+            ws.send(`这里找不到【\${args}】。当前房间NPC: ${here ? here.npcs.join(', ') : '无'}
+【提示】听闻\${args}常在${masters[args] ? masters[args].location : '某处'}。输入 find 查看更多线索。\n>`);
           }
           break;
 
