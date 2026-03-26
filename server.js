@@ -931,6 +931,9 @@ function createPlayer(name) {
     // 声望
     门派声望: 0,
     正邪值: 0,
+    // 晕倒状态
+    fainted: false,
+    faintTime: 0,
   };
 }
 
@@ -1075,6 +1078,22 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    // 检查玩家是否晕倒
+    if (player && player.fainted) {
+      const now = Date.now();
+      if (now - player.faintTime >= 20000) {
+        // 20秒后醒来
+        player.fainted = false;
+        player.hp = 10;
+        ws.send('你缓缓醒来，头痛欲裂，咬牙站了起来。\n【当前】HP: 10/' + player.maxHp + '\n>');
+        return;
+      } else {
+        // 晕倒中，无法输入
+        ws.send('═══════════════════════════════════════\n       你眼前一黑，没有了任何知觉......\n═══════════════════════════════════════\n');
+        return;
+      }
+    }
+
     if (state === 'welcome') {
       if (input === '1' || input === 'login') {
         state = 'login';
@@ -1122,6 +1141,15 @@ wss.on('connection', (ws) => {
           player.暴击 = 5 + Math.floor(savedData.先天.福缘 / 2);
           player.气血 = player.maxHp;
           player.内力 = player.maxMp;
+        }
+        
+        // 检查是否晕倒状态需要恢复
+        if (player.fainted && player.faintTime) {
+          const now = Date.now();
+          if (now - player.faintTime >= 20000) {
+            player.fainted = false;
+            player.hp = 10;
+          }
         }
         
         player.title = getTitle(player.exp);
@@ -1245,6 +1273,9 @@ wss.on('connection', (ws) => {
             exp: player.exp, level: player.level, gold: player.gold,
             hp: player.hp, mp: player.mp,
             maxHp: player.maxHp, maxMp: player.maxMp,
+            // 晕倒状态
+            fainted: player.fainted,
+            faintTime: player.faintTime,
             // 技能和装备
             skills: player.skills, 
             inventory: player.inventory, 
@@ -1603,6 +1634,18 @@ wss.on('connection', (ws) => {
                 
                 const eDmg = Math.max(1, targetAtk + Math.floor(Math.random() * 10) - 5);
                 player.hp -= eDmg;
+                // 检查是否晕倒
+                if (player.hp < 5) {
+                  player.fainted = true;
+                  player.faintTime = Date.now();
+                  player.hp = 1;
+                  ws.send('═══════════════════════════════════════\n       你眼前一黑，没有了任何知觉......\n═══════════════════════════════════════\n');
+                  if (onlinePlayers[target.name]) {
+                    onlinePlayers[target.name].send(`【${player.name}】倒在地上，晕了过去。\n`);
+                  }
+                  saveProgress();
+                  return;
+                }
                 const ePhrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
                 const roundLog2 = `第${round}招 │ ${target.name} ${ePhrase}，击中${player.name}！-${eDmg}HP\n`;
                 ws.send(roundLog2);
@@ -1620,6 +1663,16 @@ wss.on('connection', (ws) => {
               
               // 更新目标玩家属性
               target.hp = Math.max(1, tHp);
+              
+              // 检查目标是否晕倒
+              if (target.hp < 5) {
+                target.fainted = true;
+                target.faintTime = Date.now();
+                target.hp = 1;
+                if (onlinePlayers[target.name]) {
+                  onlinePlayers[target.name].send('═══════════════════════════════════════\n       你眼前一黑，没有了任何知觉......\n═══════════════════════════════════════\n');
+                }
+              }
               
               if (player.hp > 0) {
                 const goldGain = 20 + Math.floor(Math.random() * 30);
@@ -1673,7 +1726,19 @@ wss.on('connection', (ws) => {
                   onlinePlayers[target.name].send(winLog + '\n>');
                 }
                 player.gold = Math.max(0, player.gold - 10);
-                player.hp = Math.floor(player.maxHp / 2);
+                player.fainted = true;
+                player.faintTime = Date.now();
+                player.hp = 1;
+                ws.send('你眼前一黑，没有了任何知觉......\n>');
+                // 通知同房间其他玩家
+                Object.values(onlinePlayers).forEach(client => {
+                  if (client !== ws && client !== onlinePlayers[target.name]) {
+                    const roomPlayers = Object.values(players).filter(p => p.room === player.room);
+                    if (roomPlayers.find(p => p.name === player.name)) {
+                      client.send(`【${player.name}】倒在地上，晕了过去。\n`);
+                    }
+                  }
+                });
                 saveProgress();
               }
               break;
@@ -1726,6 +1791,25 @@ wss.on('connection', (ws) => {
               
               const eDmg = Math.max(1, 15 - (player.armor ? armors[player.armor].defense / 2 : 0));
               player.hp -= eDmg;
+              // 检查是否晕倒
+              if (player.hp < 5) {
+                player.fainted = true;
+                player.faintTime = Date.now();
+                player.hp = 1;
+                combatLog += `\n═══════════════════════════════════════\n       你眼前一黑，没有了任何知觉......\n═══════════════════════════════════════\n`;
+                ws.send(combatLog + '\n>');
+                // 通知同房间其他玩家
+                Object.values(onlinePlayers).forEach(client => {
+                  if (client !== ws) {
+                    const roomPlayers = Object.values(players).filter(p => p.room === player.room);
+                    if (roomPlayers.find(p => p.name === player.name)) {
+                      client.send(`【${player.name}】倒在地上，晕了过去。\n`);
+                    }
+                  }
+                });
+                saveProgress();
+                return;
+              }
               const ePhrase = enemyAttackPhrases[Math.floor(Math.random() * enemyAttackPhrases.length)];
               combatLog += `第${round}招 │ ${enemy} ${ePhrase}，击中${player.name}！-${eDmg}HP\n`;
               
@@ -1763,7 +1847,10 @@ wss.on('connection', (ws) => {
 ╚══════════════════════════════════════╝
 `;
               player.gold = Math.max(0, player.gold - 10);
-              player.hp = Math.floor(player.maxHp / 2);
+              player.fainted = true;
+              player.faintTime = Date.now();
+              player.hp = 1;
+              ws.send('你眼前一黑，没有了任何知觉......\n>');
               saveProgress();
             }
             ws.send(combatLog + '\n>');
