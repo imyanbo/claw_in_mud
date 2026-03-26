@@ -1570,7 +1570,8 @@ wss.on('connection', (ws) => {
                 '真气激荡', '功力运足', '身形晃动', '攻势如潮', '招式精妙'
               ];
               
-              let combatLog = `
+              // 战斗开始时立即通知双方
+              const startCombatLog = `
 ╔══════════════════════════════════════╗
 ║         ⚔️  ${player.name} VS ${target.name}  ⚔️          ║
 ╚══════════════════════════════════════╝
@@ -1580,6 +1581,11 @@ wss.on('connection', (ws) => {
 
 ───────────────────────────────────────
 `;
+              ws.send(startCombatLog);
+              if (onlinePlayers[target.name]) {
+                onlinePlayers[target.name].send(startCombatLog);
+              }
+              
               let tHp = target.hp;
               let round = 1;
               
@@ -1587,17 +1593,28 @@ wss.on('connection', (ws) => {
                 const dmg = Math.max(1, playerAtk + Math.floor(Math.random() * 10) - 5);
                 tHp -= dmg;
                 const phrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
-                combatLog += `第${round}招 │ ${player.name} ${phrase}，击中${target.name}！-${dmg}HP\n`;
+                const roundLog1 = `第${round}招 │ ${player.name} ${phrase}，击中${target.name}！-${dmg}HP\n`;
+                ws.send(roundLog1);
+                if (onlinePlayers[target.name]) {
+                  onlinePlayers[target.name].send(roundLog1);
+                }
                 
                 if (tHp <= 0) break;
                 
                 const eDmg = Math.max(1, targetAtk + Math.floor(Math.random() * 10) - 5);
                 player.hp -= eDmg;
                 const ePhrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
-                combatLog += `第${round}招 │ ${target.name} ${ePhrase}，击中${player.name}！-${eDmg}HP\n`;
+                const roundLog2 = `第${round}招 │ ${target.name} ${ePhrase}，击中${player.name}！-${eDmg}HP\n`;
+                ws.send(roundLog2);
+                if (onlinePlayers[target.name]) {
+                  onlinePlayers[target.name].send(roundLog2);
+                }
                 
-                combatLog += `        │ ${player.name} HP:${Math.max(0, player.hp)}/${player.maxHp}  ${target.name} HP:${Math.max(0, tHp)}/${target.maxHp}\n`;
-                combatLog += `───────────────────────────────────────\n`;
+                const statusLog = `        │ ${player.name} HP:${Math.max(0, player.hp)}/${player.maxHp}  ${target.name} HP:${Math.max(0, tHp)}/${target.maxHp}\n───────────────────────────────────────\n`;
+                ws.send(statusLog);
+                if (onlinePlayers[target.name]) {
+                  onlinePlayers[target.name].send(statusLog);
+                }
                 round++;
               }
               
@@ -1612,7 +1629,7 @@ wss.on('connection', (ws) => {
                 const oldTitle = player.title;
                 player.title = getTitle(player.exp);
                 let titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
-                combatLog += `
+                const winLog = `
 ╔══════════════════════════════════════╗
 ║           🏆 战斗胜利  🏆              ║
 ╠══════════════════════════════════════╣
@@ -1622,9 +1639,21 @@ wss.on('connection', (ws) => {
 ║  当前经验: ${player.exp}                     ║
 ╚══════════════════════════════════════╝${titleMsg}
 `;
+                ws.send(winLog + '\n>');
+                if (onlinePlayers[target.name]) {
+                  const loseLog = `
+╔══════════════════════════════════════╗
+║           💀 战斗落败  💀              ║
+╠══════════════════════════════════════╣
+║  你被 ${player.name} 击败了...            ║
+║  损失金币: 10                       ║
+╚══════════════════════════════════════╝
+`;
+                  onlinePlayers[target.name].send(loseLog + '\n>');
+                }
                 saveProgress();
               } else {
-                combatLog += `
+                const loseLog = `
 ╔══════════════════════════════════════╗
 ║           💀 战斗落败  💀              ║
 ╠══════════════════════════════════════╣
@@ -1632,11 +1661,21 @@ wss.on('connection', (ws) => {
 ║  损失金币: 10                       ║
 ╚══════════════════════════════════════╝
 `;
+                ws.send(loseLog + '\n>');
+                if (onlinePlayers[target.name]) {
+                  const winLog = `
+╔══════════════════════════════════════╗
+║           🏆 战斗胜利  🏆              ║
+╠══════════════════════════════════════╣
+║  击败了 ${player.name}                    ║
+╚══════════════════════════════════════╝
+`;
+                  onlinePlayers[target.name].send(winLog + '\n>');
+                }
                 player.gold = Math.max(0, player.gold - 10);
                 player.hp = Math.floor(player.maxHp / 2);
                 saveProgress();
               }
-              ws.send(combatLog + '\n>');
               break;
             }
             // 如果指定了对手但不是在线玩家，继续执行NPC战斗
