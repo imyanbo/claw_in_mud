@@ -934,6 +934,9 @@ function createPlayer(name) {
     // 晕倒状态
     fainted: false,
     faintTime: 0,
+    // 睡觉状态
+    sleeping: false,
+    sleepStartTime: 0,
   };
 }
 
@@ -1094,6 +1097,31 @@ wss.on('connection', (ws) => {
       }
     }
 
+    // 检查玩家是否在睡觉
+    if (player && player.sleeping) {
+      const now = Date.now();
+      if (now - player.sleepStartTime >= 20000) {
+        // 20秒后醒来
+        player.sleeping = false;
+        player.hp = player.maxHp;
+        // 根据恢复情况给出不同提示
+        let wakeMsg;
+        if (player.hp >= player.maxHp * 0.8) {
+          wakeMsg = '一觉醒来，你感到神清气爽';
+        } else if (player.hp >= player.maxHp * 0.5) {
+          wakeMsg = '一觉醒来，你感觉身体恢复了不少';
+        } else {
+          wakeMsg = '一觉醒来，你感觉腰酸背痛';
+        }
+        ws.send(wakeMsg + '。\n【当前】HP: ' + player.hp + '/' + player.maxHp + '\n>');
+        saveProgress();
+        return;
+      } else {
+        ws.send('你正在睡觉，不要打扰你。\n>');
+        return;
+      }
+    }
+
     if (state === 'welcome') {
       if (input === '1' || input === 'login') {
         state = 'login';
@@ -1149,6 +1177,15 @@ wss.on('connection', (ws) => {
           if (now - player.faintTime >= 20000) {
             player.fainted = false;
             player.hp = 10;
+          }
+        }
+        
+        // 检查是否睡觉状态需要恢复
+        if (player.sleeping && player.sleepStartTime) {
+          const now = Date.now();
+          if (now - player.sleepStartTime >= 20000) {
+            player.sleeping = false;
+            player.hp = player.maxHp;
           }
         }
         
@@ -1276,6 +1313,9 @@ wss.on('connection', (ws) => {
             // 晕倒状态
             fainted: player.fainted,
             faintTime: player.faintTime,
+            // 睡觉状态
+            sleeping: player.sleeping,
+            sleepStartTime: player.sleepStartTime,
             // 技能和装备
             skills: player.skills, 
             inventory: player.inventory, 
@@ -1327,6 +1367,42 @@ wss.on('connection', (ws) => {
           } else {
             ws.send(formatOutputBrief(player, player.room));
           }
+          break;
+        
+        case 'sleep':
+        case '睡觉':
+          // 检查是否在客栈客房
+          if (player.room !== '客房') {
+            ws.send('这不是你睡觉的地方。\n>');
+            break;
+          }
+          // 检查是否已经在睡觉
+          if (player.sleeping) {
+            ws.send('你已经在睡觉了。\n>');
+            break;
+          }
+          // 开始睡觉
+          player.sleeping = true;
+          player.sleepStartTime = Date.now();
+          ws.send('你往床上一倒，沉沉睡去......\n');
+          // 20秒后醒来
+          setTimeout(() => {
+            if (player && player.sleeping) {
+              player.sleeping = false;
+              player.hp = player.maxHp;
+              // 根据恢复情况给出不同提示
+              let wakeMsg;
+              if (player.hp >= player.maxHp * 0.8) {
+                wakeMsg = '一觉醒来，你感到神清气爽';
+              } else if (player.hp >= player.maxHp * 0.5) {
+                wakeMsg = '一觉醒来，你感觉身体恢复了不少';
+              } else {
+                wakeMsg = '一觉醒来，你感觉腰酸背痛';
+              }
+              ws.send(wakeMsg + '。\n【当前】HP: ' + player.hp + '/' + player.maxHp + '\n>');
+              saveProgress();
+            }
+          }, 20000);
           break;
         
         case 'hp':
@@ -1432,8 +1508,12 @@ wss.on('connection', (ws) => {
         case 'west':
         case '西':
           if (movePlayer(player, '西')) { saveProgress(); ws.send(formatOutputBrief(player, '你向西走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('西边没有路。可用: ' + exits); } break;
-        case 'u': if (movePlayer(player, '上')) { saveProgress(); ws.send(formatOutputBrief(player, '你向上走去')); } else ws.send('上面没有路。'); break;
-        case 'd': if (movePlayer(player, '下')) { saveProgress(); ws.send(formatOutputBrief(player, '你向下走去')); } else ws.send('下面没有路。'); break;
+        case 'u':
+        case 'up':
+        case '上': if (movePlayer(player, '上')) { saveProgress(); ws.send(formatOutputBrief(player, '你向上走去')); } else ws.send('上面没有路。'); break;
+        case 'd':
+        case 'down':
+        case '下': if (movePlayer(player, '下')) { saveProgress(); ws.send(formatOutputBrief(player, '你向下走去')); } else ws.send('下面没有路。'); break;
 
         case 'skills':
           // 查看指定师父的技能
