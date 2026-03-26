@@ -137,21 +137,25 @@ function isValidUsername(name) {
 }
 
 const weapons = {
-  '木剑': { damage: 5, price: 10, desc: '一把普通的木剑' },
-  '铁剑': { damage: 15, price: 50, desc: '精铁打造的剑' },
-  '长剑': { damage: 25, price: 100, desc: '锋利的长剑' },
-  '屠龙刀': { damage: 80, price: 2000, desc: '武林至尊，宝刀屠龙' },
-  '倚天剑': { damage: 75, price: 1800, desc: '倚天不出，谁与争锋' },
-  '君子剑': { damage: 45, price: 800, desc: '华山派镇派之宝' },
-  '淑女剑': { damage: 40, price: 700, desc: '华山派雌剑' }
+  '木剑': { damage: 5, price: 10, weight: 5, desc: '一把普通的木剑' },
+  '铁剑': { damage: 15, price: 50, weight: 8, desc: '精铁打造的剑' },
+  '长剑': { damage: 25, price: 100, weight: 10, desc: '锋利的长剑' },
+  '屠龙刀': { damage: 80, price: 2000, weight: 30, desc: '武林至尊，宝刀屠龙' },
+  '倚天剑': { damage: 75, price: 1800, weight: 25, desc: '倚天不出，谁与争锋' },
+  '君子剑': { damage: 45, price: 800, weight: 15, desc: '华山派镇派之宝' },
+  '淑女剑': { damage: 40, price: 700, weight: 15, desc: '华山派雌剑' },
+  // 黑市商品
+  '大片刀': { damage: 30, price: 150, weight: 20, desc: '黑市刀具，锋利无比' },
+  '散弹枪': { damage: 500, price: 5000, weight: 15, desc: '远程武器，可发射3次', ammo: 3 },
+  '铜钱': { damage: 0, price: 1, weight: 0, desc: '随身携带的铜钱' }
 };
 
 const armors = {
-  '布衣': { defense: 3, price: 10, desc: '普通的布衣' },
-  '皮甲': { defense: 8, price: 30, desc: '皮革制成的护甲' },
-  '铁甲': { defense: 15, price: 80, desc: '铁片编织的铠甲' },
-  '金丝甲': { defense: 30, price: 500, desc: '刀枪不入的金丝甲' },
-  '软猬甲': { defense: 35, price: 800, desc: '桃花岛至宝' }
+  '布衣': { defense: 3, price: 10, weight: 3, desc: '普通的布衣' },
+  '皮甲': { defense: 8, price: 30, weight: 8, desc: '皮革制成的护甲' },
+  '铁甲': { defense: 15, price: 80, weight: 20, desc: '铁片编织的铠甲' },
+  '金丝甲': { defense: 30, price: 500, weight: 10, desc: '刀枪不入的金丝甲' },
+  '软猬甲': { defense: 35, price: 800, weight: 12, desc: '桃花岛至宝' }
 };
 
 const skillDb = {
@@ -896,6 +900,8 @@ function createPlayer(name) {
   const 命中 = 80 + baseAttr.悟性 * 2;
   const 闪避 = 10 + Math.floor(baseAttr.经脉 / 2);
   const 暴击 = 5 + Math.floor(baseAttr.福缘 / 2);
+  // 负重上限 = 50 + 根骨 * 10
+  const maxWeight = 50 + baseAttr.根骨 * 10;
   
   return {
     name,
@@ -903,9 +909,10 @@ function createPlayer(name) {
     hp: maxHp, maxHp: maxHp,
     mp: maxMp, maxMp: maxMp,
     exp: 0, level: 1,
-    gold: 50,
+    coin: 50,  // 金币
     skills: JSON.parse(JSON.stringify(skills)),
-    inventory: [],
+    inventory: ['铜钱'],  // 初始携带铜钱
+    maxWeight: maxWeight,  // 负重上限
     weapon: null, armor: null,
     title: '初入江湖',
     follows: [],
@@ -1036,7 +1043,7 @@ function formatOutput(player, message) {
   output += `根骨:${player.先天.根骨} 悟性:${player.先天.悟性} 经脉:${player.先天.经脉} 福缘:${player.先天.福缘}\n`;
   output += `HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp}\n`;
   output += `攻击:${player.外功攻击} 防御:${player.防御} 身法:${player.身法}\n`;
-  output += `经验:${player.exp} 金币:${player.gold}\n`;
+  output += `经验:${player.exp} 金币:${player.coin}\n`;
   if (player.weapon || player.armor) {
     output += `装备: ${player.weapon || '无'}(攻+${weaponDmg}) ${player.armor || '无'}(防+${armorDef})\n`;
   }
@@ -1060,7 +1067,7 @@ wss.on('connection', (ws) => {
       console.log(`[玩家断开] ${player.name}`);
       if (users[player.name]) {
         Object.assign(users[player.name], {
-          exp: player.exp, level: player.level, gold: player.gold,
+          exp: player.exp, level: player.level, coin: player.coin,
           skills: player.skills, hp: player.hp, mp: player.mp,
           inventory: player.inventory, weapon: player.weapon, armor: player.armor,
           follows: player.follows, master: player.master, school: player.school
@@ -1307,7 +1314,7 @@ wss.on('connection', (ws) => {
           // 保存所有玩家数据
           Object.assign(users[player.name], {
             // 基本属性
-            exp: player.exp, level: player.level, gold: player.gold,
+            exp: player.exp, level: player.level, coin: player.coin,
             hp: player.hp, mp: player.mp,
             maxHp: player.maxHp, maxMp: player.maxMp,
             // 晕倒状态
@@ -1515,6 +1522,98 @@ wss.on('connection', (ws) => {
         case 'down':
         case '下': if (movePlayer(player, '下')) { saveProgress(); ws.send(formatOutputBrief(player, '你向下走去')); } else ws.send('下面没有路。'); break;
 
+        case 'eat':
+        case '使用':
+          if (!args) {
+            ws.send('请输入物品名。\n>');
+            break;
+          }
+          if (args === 'drug' || args === '金创药') {
+            if (player.inventory.includes('金创药')) {
+              const hp恢复 = Math.floor(player.maxHp * 0.1);
+              player.hp = Math.min(player.maxHp, player.hp + hp恢复);
+              player.inventory = player.inventory.filter(i => i !== '金创药');
+              saveProgress();
+              ws.send(`金创药使用成功，HP恢复${hp恢复}。\n【当前】HP: ${player.hp}/${player.maxHp}\n>`);
+            } else {
+              ws.send('你背包里没有金创药。\n>');
+            }
+          } else {
+            ws.send('无法使用此物品。\n>');
+          }
+          break;
+
+        case 'mount':
+        case '装备':
+          if (!args) {
+            ws.send('请输入装备名称。\n>');
+            break;
+          }
+          if (args === 'blade' || args === '大片刀') {
+            if (player.inventory.includes('大片刀')) {
+              player.weapon = '大片刀';
+              saveProgress();
+              ws.send('大片刀装备成功！攻击力+30\n>');
+            } else {
+              ws.send('你背包里没有大片刀。\n>');
+            }
+          } else if (args === '散弹枪') {
+            if (player.inventory.includes('散弹枪')) {
+              player.weapon = '散弹枪';
+              saveProgress();
+              ws.send('散弹枪装备成功！输入 shoot [玩家名] 射击。\n>');
+            } else {
+              ws.send('你背包里没有散弹枪。\n>');
+            }
+          } else {
+            ws.send('无法装备此物品。\n>');
+          }
+          break;
+
+        case 'shoot':
+        case '射击':
+          if (!args) {
+            ws.send('请输入射击目标。\n>');
+            break;
+          }
+          if (player.weapon !== '散弹枪') {
+            ws.send('你没有装备散弹枪。\n>');
+            break;
+          }
+          if (!player.weaponAmmo || player.weaponAmmo <= 0) {
+            ws.send('散弹枪弹药已用尽！\n>');
+            break;
+          }
+          const target = Object.values(players).find(p => p.name === args && p.room === player.room && p.name !== player.name);
+          if (!target) {
+            ws.send('这里没有这个玩家。\n>');
+            break;
+          }
+          const dmg = 500;
+          target.hp -= dmg;
+          player.weaponAmmo -= 1;
+          if (target.hp < 5) {
+            target.fainted = true;
+            target.faintTime = Date.now();
+            target.hp = 1;
+            ws.send('你瞄准' + target.name + '开了一枪！-' + dmg + 'HP\n' + target.name + '倒在地上，晕了过去。\n剩余弹药: ' + player.weaponAmmo + '\n>');
+            if (onlinePlayers[target.name]) {
+              onlinePlayers[target.name].send('你眼前一黑，没有了任何知觉......\n>');
+            }
+          } else {
+            ws.send('你瞄准' + target.name + '开了一枪！-' + dmg + 'HP\n' + target.name + ' HP: ' + target.hp + '/' + target.maxHp + '\n剩余弹药: ' + player.weaponAmmo + '\n>');
+            if (onlinePlayers[target.name]) {
+              onlinePlayers[target.name].send('【警告】' + player.name + '用散弹枪射击了你！-' + dmg + 'HP\n【当前】HP: ' + target.hp + '/' + target.maxHp + '\n>');
+            }
+          }
+          if (player.weaponAmmo <= 0) {
+            player.weapon = null;
+            player.inventory = player.inventory.filter(i => i !== '散弹枪');
+            ws.send('散弹枪弹药已用尽，武器已销毁。\n>');
+          }
+          saveProgress();
+          break;
+
         case 'skills':
           // 查看指定师父的技能
           if (args && masters[args]) {
@@ -1609,15 +1708,74 @@ wss.on('connection', (ws) => {
           ws.send(shopMsg + '\n>');
           break;
 
+        case 't':
+        case 'talk':
+        case '对话':
+          if (!args) {
+            ws.send('请输入要对话的NPC名称。\n>');
+            break;
+          }
+          const roomNpcs = getRoom(player.room)?.npcs || [];
+          if (!roomNpcs.includes(args)) {
+            ws.send('这里没有这个NPC。\n>');
+            break;
+          }
+          if (args === '黑市商人') {
+            ws.send('黑市商人警惕地看了看你，低声说道："想买点什么？输入 list 黑市商人 查看货物。"\n>');
+          } else {
+            ws.send(`你和${args}交谈了几句。\n>`);
+          }
+          break;
+
+        case 'list':
+          if (args === '黑市商人') {
+            const blackMarketGoods = `
+╔═══════════════════════════════════════╗
+║        【黑市商人】货物清单            ║
+╠═══════════════════════════════════════╣
+║  1. 金创药    恢复HP 10%   100金币   ║
+║     指令: eat drug                     ║
+║  2. 大片刀    攻击力+30     150金币   ║
+║     指令: mount blade                  ║
+║  3. 散弹枪    攻击力500     5000金币  ║
+║     指令: mount 散弹枪 + shoot        ║
+║     (可发射3次，三次后消失)            ║
+╚═══════════════════════════════════════╝
+输入 buy [物品名] 购买\n>`;
+            ws.send(blackMarketGoods);
+          } else {
+            ws.send('未知的商店。\n>');
+          }
+          break;
+
         case 'buy':
           const room2 = getRoom(player.room);
           if (!room2 || !room2.shop || !args) {
             ws.send('请输入物品名。\n>');
             break;
           }
+          
+          // 计算当前负重
+          var currentWeight = 0;
+          player.inventory.forEach(item => {
+            if (weapons[item] && weapons[item].weight) currentWeight += weapons[item].weight;
+            else if (armors[item] && armors[item].weight) currentWeight += armors[item].weight;
+          });
+          if (player.weapon && weapons[player.weapon] && weapons[player.weapon].weight) {
+            currentWeight += weapons[player.weapon].weight;
+          }
+          if (player.armor && armors[player.armor] && armors[player.armor].weight) {
+            currentWeight += armors[player.armor].weight;
+          }
+          
           if (room2.shop === 'weapon' && weapons[args]) {
-            if (player.gold >= weapons[args].price) {
-              player.gold -= weapons[args].price;
+            const itemWeight = weapons[args].weight || 0;
+            if (currentWeight + itemWeight > player.maxWeight) {
+              ws.send('负重不足！无法携带更多物品。\n>');
+              break;
+            }
+            if (player.coin >= weapons[args].price) {
+              player.coin -= weapons[args].price;
               player.weapon = args;
               if (!player.inventory.includes(args)) player.inventory.push(args);
               saveProgress();
@@ -1626,8 +1784,13 @@ wss.on('connection', (ws) => {
               ws.send('金币不足！\n>');
             }
           } else if (room2.shop === 'armor' && armors[args]) {
-            if (player.gold >= armors[args].price) {
-              player.gold -= armors[args].price;
+            const itemWeight = armors[args].weight || 0;
+            if (currentWeight + itemWeight > player.maxWeight) {
+              ws.send('负重不足！无法携带更多物品。\n>');
+              break;
+            }
+            if (player.coin >= armors[args].price) {
+              player.coin -= armors[args].price;
               player.armor = args;
               if (!player.inventory.includes(args)) player.inventory.push(args);
               saveProgress();
@@ -1636,24 +1799,44 @@ wss.on('connection', (ws) => {
               ws.send('金币不足！\n>');
             }
           } else if (room2.shop === 'medicine') {
-            if (args === '金创药' && player.gold >= 20) {
-              player.gold -= 20;
+            if (args === '金创药' && player.coin >= 20) {
+              player.coin -= 20;
               player.hp = Math.min(player.maxHp, player.hp + 50);
               saveProgress();
               ws.send('金创药使用成功，HP恢复50。\n>');
-            } else if (args === '九转灵丹' && player.gold >= 50) {
-              player.gold -= 50;
+            } else if (args === '九转灵丹' && player.coin >= 50) {
+              player.coin -= 50;
               player.hp = Math.min(player.maxHp, player.hp + 100);
               saveProgress();
               ws.send('九转灵丹使用成功，HP恢复100。\n>');
-            } else if (args === '内力丹' && player.gold >= 30) {
-              player.gold -= 30;
+            } else if (args === '内力丹' && player.coin >= 30) {
+              player.coin -= 30;
               player.mp = Math.min(player.maxMp, player.mp + 30);
               saveProgress();
               ws.send('内力丹使用成功，MP恢复30。\n>');
             } else {
               ws.send('金币不足或物品不存在。\n>');
             }
+          } else if (args === '金创药' && player.room === '旧码头区' && player.coin >= 100) {
+            player.coin -= 100;
+            player.inventory.push('金创药');
+            saveProgress();
+            ws.send('购买成功！金创药已放入背包。使用 eat drug 恢复HP。\n>');
+          } else if (args === '大片刀' && player.room === '旧码头区' && player.coin >= 150) {
+            player.coin -= 150;
+            player.weapon = '大片刀';
+            if (!player.inventory.includes('大片刀')) player.inventory.push('大片刀');
+            saveProgress();
+            ws.send('购买成功！大片刀已装备。攻击力+30\n>');
+          } else if (args === '散弹枪' && player.room === '旧码头区' && player.coin >= 5000) {
+            player.coin -= 5000;
+            player.weapon = '散弹枪';
+            player.weaponAmmo = 3;
+            if (!player.inventory.includes('散弹枪')) player.inventory.push('散弹枪');
+            saveProgress();
+            ws.send('购买成功！散弹枪已装备。输入 shoot [玩家名] 射击。可发射3次。\n>');
+          } else if (['金创药', '大片刀', '散弹枪'].includes(args) && player.room !== '旧码头区') {
+            ws.send('这里买不到这种商品。去旧码头区找黑市商人。\n>');
           } else {
             ws.send('没有这种物品。\n>');
           }
@@ -1661,8 +1844,29 @@ wss.on('connection', (ws) => {
 
         case 'i':
         case 'inventory':
+          // 计算当前负重
+          var weight = 0;
+          player.inventory.forEach(item => {
+            if (weapons[item] && weapons[item].weight) weight += weapons[item].weight;
+            else if (armors[item] && armors[item].weight) weight += armors[item].weight;
+          });
+          // 如果有武器在手上
+          if (player.weapon && weapons[player.weapon] && weapons[player.weapon].weight) {
+            weight += weapons[player.weapon].weight;
+          }
+          // 如果有护甲在身上
+          if (player.armor && armors[player.armor] && armors[player.armor].weight) {
+            weight += armors[player.armor].weight;
+          }
+          
           let invMsg = '\n【包裹】\n';
-          invMsg += player.inventory.length === 0 ? '背包是空的\n' : player.inventory.join(', ') + '\n';
+          if (player.inventory.length === 0) {
+            invMsg += '背包是空的\n';
+          } else {
+            invMsg += player.inventory.join(', ') + '\n';
+          }
+          invMsg += '\n【负重】' + weight + '/' + player.maxWeight + '\n';
+          invMsg += '【铜钱】' + player.coin + '\n';
           ws.send(invMsg + '\n>');
           break;
 
@@ -1757,7 +1961,7 @@ wss.on('connection', (ws) => {
               if (player.hp > 0) {
                 const goldGain = 20 + Math.floor(Math.random() * 30);
                 const expGain = 30 + Math.floor(Math.random() * 20);
-                player.gold += goldGain;
+                player.coin += goldGain;
                 player.exp += expGain;
                 const oldTitle = player.title;
                 player.title = getTitle(player.exp);
@@ -1805,7 +2009,7 @@ wss.on('connection', (ws) => {
 `;
                   onlinePlayers[target.name].send(winLog + '\n>');
                 }
-                player.gold = Math.max(0, player.gold - 10);
+                player.coin = Math.max(0, player.coin - 10);
                 player.fainted = true;
                 player.faintTime = Date.now();
                 player.hp = 1;
@@ -1902,7 +2106,7 @@ wss.on('connection', (ws) => {
             if (player.hp > 0) {
               const goldGain = 10 + Math.floor(Math.random() * 20);
               const expGain = 20 + Math.floor(Math.random() * 15);
-              player.gold += goldGain;
+              player.coin += goldGain;
               player.exp += expGain;
               const oldTitle = player.title;
               player.title = getTitle(player.exp);
@@ -1926,7 +2130,7 @@ wss.on('connection', (ws) => {
 ║  损失金币: 10                       ║
 ╚══════════════════════════════════════╝
 `;
-              player.gold = Math.max(0, player.gold - 10);
+              player.coin = Math.max(0, player.coin - 10);
               player.fainted = true;
               player.faintTime = Date.now();
               player.hp = 1;
@@ -2149,12 +2353,12 @@ wss.on('connection', (ws) => {
             ws.send('用法: meme 公告内容（耗费30精力+50金币）\n>');
             break;
           }
-          if (player.气血 < 30 || player.gold < 50) {
+          if (player.气血 < 30 || player.coin < 50) {
             ws.send('精力不足30或金币不足50，无法发布公告。\n>');
             break;
           }
           player.气血 -= 30;
-          player.gold -= 50;
+          player.coin -= 50;
           // 发送给所有在线玩家
           for (const [name, client] of Object.entries(onlinePlayers)) {
             client.send(`【匿名公告】\${args}\n─────────────────────\n`);
@@ -2188,12 +2392,12 @@ wss.on('connection', (ws) => {
             ws.send('用法: @all 公告内容（耗费50精力+100金币）\n>');
             break;
           }
-          if (player.气血 < 50 || player.gold < 100) {
+          if (player.气血 < 50 || player.coin < 100) {
             ws.send('精力不足50或金币不足100，无法发布全体公告。\n>');
             break;
           }
           player.气血 -= 50;
-          player.gold -= 100;
+          player.coin -= 100;
           for (const [name, client] of Object.entries(onlinePlayers)) {
             client.send(`【全体公告】【${player.name}】\${args}\n══════════════════════════════\n`);
           }
@@ -2223,7 +2427,7 @@ wss.on('connection', (ws) => {
 ║ 【战斗衍生】                                ║
 ║ 命中: ${player.命中}%  闪避: ${player.闪避}%  暴击: ${player.暴击}%     ║
 ╠══════════════════════════════════════╣
-║ 经验: ${player.exp}  金币: ${player.gold}                      ║
+║ 经验: ${player.exp}  金币: ${player.coin}                      ║
 ╚══════════════════════════════════════╝
 `;
           if (player.weapon) statusMsg += `武器: ${player.weapon}(攻击+${weapons[player.weapon].damage})\n`;
@@ -2423,7 +2627,7 @@ wss.on('connection', (ws) => {
               const rewardExp = 50;
               const rewardGold = 20;
               player.exp += rewardExp;
-              player.gold += rewardGold;
+              player.coin += rewardGold;
               ws.send(`【任务完成: 远洋迷雾】🎉
 
 你成功解码了神秘信号，获得了来自未知文明的警告！
@@ -2449,7 +2653,7 @@ wss.on('connection', (ws) => {
               const rewardExp = 100;
               const rewardGold = 50;
               player.exp += rewardExp;
-              player.gold += rewardGold;
+              player.coin += rewardGold;
               ws.send(`【任务完成: 三体降临】🎉
 
 你在中央科研区见到了神秘人，得知了更多关于"三体"文明的信息...
@@ -2477,7 +2681,7 @@ wss.on('connection', (ws) => {
               const rewardExp = 150;
               const rewardGold = 80;
               player.exp += rewardExp;
-              player.gold += rewardGold;
+              player.coin += rewardGold;
               ws.send(`【任务完成: ETO潜伏】🎉
 
 你在ETO秘密基地发现了惊人的秘密！
@@ -2505,7 +2709,7 @@ ETO组织正在为"他们"的到来做准备...
               const rewardExp = 200;
               const rewardGold = 100;
               player.exp += rewardExp;
-              player.gold += rewardGold;
+              player.coin += rewardGold;
               ws.send(`【任务完成: 深空监听】🎉
 
 你成功接收到了三体文明的信号！
@@ -2535,7 +2739,7 @@ ETO组织正在为"他们"的到来做准备...
               const rewardExp = 120;
               const rewardGold = 60;
               player.exp += rewardExp;
-              player.gold += rewardGold;
+              player.coin += rewardGold;
               ws.send(`【任务完成: 桃花岛】🎉
 
 黄药师对你的资质非常满意，
@@ -2562,7 +2766,7 @@ ETO组织正在为"他们"的到来做准备...
               const rewardExp = 180;
               const rewardGold = 80;
               player.exp += rewardExp;
-              player.gold += rewardGold;
+              player.coin += rewardGold;
               ws.send(`【任务完成: 凤栖疑云】🎉
 
 你在珠光宝气阁调查发现，这里与青衣楼有密切关联！
@@ -2587,7 +2791,7 @@ ETO组织正在为"他们"的到来做准备...
               const rewardExp = 250;
               const rewardGold = 120;
               player.exp += rewardExp;
-              player.gold += rewardGold;
+              player.coin += rewardGold;
               ws.send(`【任务完成: 青衣楼阴谋】🎉
 
 你在青衣楼密室发现了霍休的惊天阴谋！
@@ -2615,7 +2819,7 @@ ETO组织正在为"他们"的到来做准备...
               const rewardExp = 300;
               const rewardGold = 150;
               player.exp += rewardExp;
-              player.gold += rewardGold;
+              player.coin += rewardGold;
               ws.send(`【任务完成: 紫禁之战】🎉
 
 你见证了西门吹雪与叶孤城的世纪决战！
