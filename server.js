@@ -86,7 +86,7 @@ function issueSession(userName, ws) {
   };
   const session = db.createSession(userName, meta);
   ws.sessionToken = session.token;
-  ws.send(`session:${session.token}`);
+  // ws.send(`session:${session.token}`);
   ws.send(`version:${APP_VERSION}`);
   return session;
 }
@@ -1218,7 +1218,7 @@ wss.on('connection', (ws) => {
         ws.send(formatOutput(player, '欢迎回来，' + tempName + '！'));
         
         const session = issueSession(tempName, ws);
-        ws.send('【江湖秘术】' + tempName + '又回到了这个世界~ session:' + session.token);
+        ws.send('【江湖秘术】' + tempName + '又回到了这个世界~');
         
         // 通知关注者
         if (savedData && savedData.follows) {
@@ -1298,7 +1298,7 @@ wss.on('connection', (ws) => {
 ╚════════════════════════════════════╝
 `);
       const session = issueSession(tempName, ws);
-      ws.send('【江湖秘术】' + tempName + '又回到了这个世界~ session:' + session.token);
+      ws.send('【江湖秘术】' + tempName + '又回到了这个世界~');
       ws.send(formatOutput(player, '注册成功！江湖欢迎你'));
       return;
     }
@@ -2893,7 +2893,7 @@ ETO组织正在为"他们"的到来做准备...
 '╚════════════════════════════════════╝\n';
               ws.send(welcomeMsg2);
               ws.send(formatOutput(player, '欢迎回来，' + reconnectName + '！'));
-              ws.send('【江湖秘术】' + reconnectName + '又回到了这个世界~ session:' + session.token);
+              ws.send('【江湖秘术】' + reconnectName + '又回到了这个世界~');
               break;
             } else {
               ws.send('登录已过期，请重新登录。\n>');
