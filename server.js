@@ -299,9 +299,9 @@ const rooms = {
     area: '江湖'
   },
   '赌场': {
-    description: '扬州城内最大的赌场，乌烟瘴气，骰子声、叫喝声此起彼伏。',
+    description: '扬州城内最大的赌场，乌烟瘴气，骰子声、叫喝声此起彼伏。角落里新摆了三张掼蛋牌桌，分别收铜钱、银两、黄金做底注。',
     exits: { '西': '扬州街' },
-    npcs: ['赌徒', '庄家'],
+    npcs: ['赌徒', '庄家', '荷官', '牌桌老李', '牌桌老周', '牌桌老孙'],
     shop: null
   },
   '扬州码头': {
@@ -909,7 +909,9 @@ function createPlayer(name) {
     hp: maxHp, maxHp: maxHp,
     mp: maxMp, maxMp: maxMp,
     exp: 0, level: 1,
-    coin: 50,  // 金币
+    coin: 500,  // 铜钱
+    silver: 5,
+    gold: 1,
     skills: JSON.parse(JSON.stringify(skills)),
     inventory: ['铜钱'],  // 初始携带铜钱
     maxWeight: maxWeight,  // 负重上限
@@ -944,10 +946,288 @@ function createPlayer(name) {
     // 睡觉状态
     sleeping: false,
     sleepStartTime: 0,
+    // 扬州赌场掼蛋
+    guandan: null,
   };
 }
 
 const onlinePlayers = {};
+
+function ensureMoneyState(player) {
+  if (typeof player.coin !== 'number' || Number.isNaN(player.coin)) player.coin = 0;
+  if (typeof player.silver !== 'number' || Number.isNaN(player.silver)) player.silver = 0;
+  if (typeof player.gold !== 'number' || Number.isNaN(player.gold)) player.gold = 0;
+  if (!player.guandan) player.guandan = null;
+}
+
+function getMoneySummary(player) {
+  ensureMoneyState(player);
+  return `铜钱:${player.coin} 银:${player.silver} 金:${player.gold}`;
+}
+
+function canAffordStake(player, currency, amount) {
+  ensureMoneyState(player);
+  if (currency === '铜') return player.coin >= amount;
+  if (currency === '银') return player.silver >= amount;
+  if (currency === '金') return player.gold >= amount;
+  return false;
+}
+
+function spendStake(player, currency, amount) {
+  if (!canAffordStake(player, currency, amount)) return false;
+  if (currency === '铜') player.coin -= amount;
+  if (currency === '银') player.silver -= amount;
+  if (currency === '金') player.gold -= amount;
+  return true;
+}
+
+function addStake(player, currency, amount) {
+  ensureMoneyState(player);
+  if (currency === '铜') player.coin += amount;
+  if (currency === '银') player.silver += amount;
+  if (currency === '金') player.gold += amount;
+}
+
+function getGuandanTierInfo(currency) {
+  if (currency === '铜') return { min: 100, max: 1000, feePercent: 5, label: '铜钱小桌' };
+  if (currency === '银') return { min: 1, max: 20, feePercent: 8, label: '银两中桌' };
+  if (currency === '金') return { min: 1, max: 5, feePercent: 10, label: '黄金大桌' };
+  return null;
+}
+
+function createDeck() {
+  const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const deck = [];
+  for (let copy = 0; copy < 2; copy++) {
+    for (const rank of ranks) {
+      for (let i = 0; i < 4; i++) deck.push(rank);
+    }
+    deck.push('SJ');
+    deck.push('BJ');
+  }
+  return deck;
+}
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+const GUANDAN_RANK_VALUE = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, J: 11, Q: 12, K: 13, A: 14, SJ: 16, BJ: 17 };
+
+function sortCards(cards) {
+  return [...cards].sort((a, b) => GUANDAN_RANK_VALUE[a] - GUANDAN_RANK_VALUE[b]);
+}
+
+function getCounts(cards) {
+  const map = {};
+  for (const c of cards) map[c] = (map[c] || 0) + 1;
+  return map;
+}
+
+function parsePlay(cards) {
+  if (!cards || !cards.length) return null;
+  const sorted = sortCards(cards);
+  const counts = getCounts(sorted);
+  const ranks = Object.keys(counts).sort((a, b) => GUANDAN_RANK_VALUE[a] - GUANDAN_RANK_VALUE[b]);
+  const len = sorted.length;
+  if (len === 1) return { type: 'single', value: GUANDAN_RANK_VALUE[sorted[0]], cards: sorted, label: sorted[0] };
+  if (len === 2 && ranks.length === 1) return { type: 'pair', value: GUANDAN_RANK_VALUE[ranks[0]], cards: sorted, label: `${ranks[0]}${ranks[0]}` };
+  if (len === 2 && counts.SJ === 1 && counts.BJ === 1) return { type: 'jokerbomb', value: 999, cards: sorted, label: '王炸' };
+  if (len === 3 && ranks.length === 1) return { type: 'triple', value: GUANDAN_RANK_VALUE[ranks[0]], cards: sorted, label: `${ranks[0]}×3` };
+  if (len === 4 && ranks.length === 1) return { type: 'bomb', value: GUANDAN_RANK_VALUE[ranks[0]], size: 4, cards: sorted, label: `${ranks[0]}炸弹` };
+  if (len === 5 && ranks.length === 2) {
+    const tripleRank = ranks.find(r => counts[r] === 3);
+    const pairRank = ranks.find(r => counts[r] === 2);
+    if (tripleRank && pairRank) return { type: 'fullhouse', value: GUANDAN_RANK_VALUE[tripleRank], cards: sorted, label: `${tripleRank}三带二` };
+  }
+  return null;
+}
+
+function canBeat(play, current) {
+  if (!current) return true;
+  if (!play) return false;
+  if (play.type === 'jokerbomb') return true;
+  if (current.type === 'jokerbomb') return false;
+  if (play.type === 'bomb' && current.type !== 'bomb') return true;
+  if (play.type === 'bomb' && current.type === 'bomb') {
+    if ((play.size || 4) !== (current.size || 4)) return (play.size || 4) > (current.size || 4);
+    return play.value > current.value;
+  }
+  if (current.type === 'bomb') return false;
+  if (play.type !== current.type) return false;
+  return play.cards.length === current.cards.length && play.value > current.value;
+}
+
+function removeCardsFromHand(hand, cards) {
+  const next = [...hand];
+  for (const card of cards) {
+    const idx = next.indexOf(card);
+    if (idx === -1) return null;
+    next.splice(idx, 1);
+  }
+  return next;
+}
+
+function enumeratePlayableHands(hand) {
+  const cards = sortCards(hand);
+  const counts = getCounts(cards);
+  const plays = [];
+  const uniq = Object.keys(counts).sort((a, b) => GUANDAN_RANK_VALUE[a] - GUANDAN_RANK_VALUE[b]);
+  for (const rank of uniq) plays.push(parsePlay([rank]));
+  for (const rank of uniq) if (counts[rank] >= 2) plays.push(parsePlay([rank, rank]));
+  for (const rank of uniq) if (counts[rank] >= 3) plays.push(parsePlay([rank, rank, rank]));
+  for (const rank of uniq) if (counts[rank] >= 4) plays.push(parsePlay([rank, rank, rank, rank]));
+  for (const triple of uniq.filter(r => counts[r] >= 3)) {
+    for (const pair of uniq.filter(r => r !== triple && counts[r] >= 2)) {
+      plays.push(parsePlay([triple, triple, triple, pair, pair]));
+    }
+  }
+  if (counts.SJ && counts.BJ) plays.push(parsePlay(['SJ', 'BJ']));
+  const dedup = new Map();
+  for (const p of plays) if (p) dedup.set(`${p.type}:${p.label}`, p);
+  return [...dedup.values()].sort((a, b) => {
+    const order = { single: 1, pair: 2, triple: 3, fullhouse: 4, bomb: 5, jokerbomb: 6 };
+    if (order[a.type] !== order[b.type]) return order[a.type] - order[b.type];
+    return a.value - b.value;
+  });
+}
+
+function formatPlay(play) {
+  if (!play) return '无';
+  const labels = { single: '单牌', pair: '对子', triple: '三张', fullhouse: '三带二', bomb: '炸弹', jokerbomb: '王炸' };
+  return `${labels[play.type] || play.type}:${play.label}`;
+}
+
+function buildGuandanState(player, currency, stake) {
+  const deck = shuffle(createDeck());
+  const seats = [player.name, '牌桌老李', '牌桌老周', '牌桌老孙'];
+  const hands = {};
+  for (const seat of seats) hands[seat] = sortCards(deck.splice(0, 27));
+  return {
+    currency,
+    stake,
+    pot: stake * 4,
+    feePercent: getGuandanTierInfo(currency).feePercent,
+    seats,
+    hands,
+    turnIndex: 0,
+    currentPlay: null,
+    currentOwner: null,
+    passCount: 0,
+    ranking: [],
+    options: [],
+    status: 'playing'
+  };
+}
+
+function getPlayerGuandanOptions(game, playerName) {
+  const all = enumeratePlayableHands(game.hands[playerName] || []);
+  return all.filter(p => canBeat(p, game.currentPlay)).slice(0, 12);
+}
+
+function renderGuandanTable(game, playerName) {
+  const hand = sortCards(game.hands[playerName] || []);
+  const options = getPlayerGuandanOptions(game, playerName);
+  game.options = options;
+  let msg = `\n【扬州赌场·简化掼蛋】\n桌级:${getGuandanTierInfo(game.currency).label} 底注:${game.stake}${game.currency}\n奖池:${game.pot}${game.currency} 抽水:${game.feePercent}%\n当前牌面:${formatPlay(game.currentPlay)}\n\n`;
+  msg += `名次:${game.ranking.length ? game.ranking.join(' -> ') : '尚未决出'}\n`;
+  msg += `\n【你的手牌】\n${hand.join(' ')}\n`;
+  msg += `\n【桌上余牌】\n`;
+  for (const seat of game.seats) {
+    msg += `${seat}: ${game.hands[seat].length}张`;
+    if (game.ranking.includes(seat)) msg += ' (已出完)';
+    if (seat === game.seats[game.turnIndex]) msg += ' ← 当前行动';
+    msg += '\n';
+  }
+  msg += `\n【可出选项】\n`;
+  if (!options.length) msg += '无可压牌，请输入 guandan pass\n';
+  else options.forEach((p, i) => { msg += `${i + 1}. ${formatPlay(p)}\n`; });
+  msg += '\n指令: guandan play 序号 | guandan pass | guandan hand | guandan quit\n>';
+  return msg;
+}
+
+function maybeFinishGuandanRound(player, game) {
+  if (game.ranking.length >= 4 || game.ranking.length >= game.seats.length - 1) {
+    for (const seat of game.seats) {
+      if (!game.ranking.includes(seat)) game.ranking.push(seat);
+    }
+    const pos = game.ranking.indexOf(player.name) + 1;
+    const multipliers = [3, 1, -1, -3];
+    const gross = multipliers[pos - 1] * game.stake;
+    let msg = `【本局结算】\n名次: ${game.ranking.join(' -> ')}\n你的名次: 第${pos}名\n`;
+    if (gross > 0) {
+      const fee = Math.floor(gross * game.feePercent / 100);
+      const net = Math.max(0, gross - fee);
+      addStake(player, game.currency, game.stake + net);
+      msg += `赢得: +${gross}${game.currency}，抽水:${fee}${game.currency}，实际到账:${game.stake + net}${game.currency}(含返还底注)\n`;
+    } else if (gross === 0) {
+      addStake(player, game.currency, game.stake);
+      msg += `平局退还底注:${game.stake}${game.currency}\n`;
+    } else {
+      msg += `本局失利，已扣除底注:${game.stake}${game.currency}\n`;
+    }
+    msg += `当前资产: ${getMoneySummary(player)}\n>`;
+    player.guandan = null;
+    return msg;
+  }
+  return null;
+}
+
+function advanceGuandan(game, player) {
+  const actorName = player.name;
+  let log = '';
+  while (game.status === 'playing' && game.seats[game.turnIndex] !== actorName) {
+    const seat = game.seats[game.turnIndex];
+    if (game.ranking.length >= game.seats.length - 1) {
+      const finishMsg = maybeFinishGuandanRound(player, game);
+      if (finishMsg) return log + finishMsg;
+    }
+    if (game.ranking.includes(seat)) {
+      game.turnIndex = (game.turnIndex + 1) % game.seats.length;
+      continue;
+    }
+    const options = enumeratePlayableHands(game.hands[seat]).filter(p => canBeat(p, game.currentPlay));
+    let selected = null;
+    if (!game.currentPlay) selected = options[0] || null;
+    else selected = options.find(p => p.type === game.currentPlay.type && p.cards.length === game.currentPlay.cards.length) || options.find(p => p.type === 'bomb' || p.type === 'jokerbomb') || null;
+    if (!selected) {
+      game.passCount += 1;
+      log += `${seat} 摇了摇头，选择不要。\n`;
+    } else {
+      game.hands[seat] = removeCardsFromHand(game.hands[seat], selected.cards);
+      game.currentPlay = selected;
+      game.currentOwner = seat;
+      game.passCount = 0;
+      log += `${seat} 打出 ${formatPlay(selected)}。\n`;
+      if (game.hands[seat].length === 0 && !game.ranking.includes(seat)) {
+        game.ranking.push(seat);
+        log += `🎉 ${seat} 率先出完了手牌。\n`;
+      }
+    }
+    if (game.passCount >= 2 && game.currentOwner) {
+      log += `一轮压制结束，由 ${game.currentOwner} 重新领牌。\n`;
+      game.turnIndex = game.seats.indexOf(game.currentOwner);
+      game.currentPlay = null;
+      game.currentOwner = null;
+      game.passCount = 0;
+    } else {
+      game.turnIndex = (game.turnIndex + 1) % game.seats.length;
+    }
+    while (game.ranking.includes(game.seats[game.turnIndex]) && game.ranking.length < 4) {
+      game.turnIndex = (game.turnIndex + 1) % game.seats.length;
+    }
+    for (const seatName of game.seats) {
+      if (!game.ranking.includes(seatName) && game.hands[seatName].length === 0) game.ranking.push(seatName);
+    }
+    const finishMsg = maybeFinishGuandanRound(player, game);
+    if (finishMsg) return log + finishMsg;
+  }
+  return log + renderGuandanTable(game, actorName);
+}
 
 function getRoom(roomName) {
   return rooms[roomName] || null;
@@ -1196,6 +1476,7 @@ wss.on('connection', (ws) => {
           }
         }
         
+        ensureMoneyState(player);
         player.title = getTitle(player.exp);
         players[tempName] = player;
         onlinePlayers[tempName] = ws;
@@ -1285,6 +1566,7 @@ wss.on('connection', (ws) => {
       saveUsers();
       reloadUsersFromDb();
       player = newPlayer;
+      ensureMoneyState(player);
       players[tempName] = player;
       onlinePlayers[tempName] = ws;
       state = 'playing';
@@ -1311,10 +1593,12 @@ wss.on('connection', (ws) => {
       function saveProgress() {
         if (users[player.name]) {
           markPlayerHeartbeat(player);
+          ensureMoneyState(player);
           // 保存所有玩家数据
           Object.assign(users[player.name], {
             // 基本属性
             exp: player.exp, level: player.level, coin: player.coin,
+            silver: player.silver, gold: player.gold,
             hp: player.hp, mp: player.mp,
             maxHp: player.maxHp, maxMp: player.maxMp,
             // 晕倒状态
@@ -1354,7 +1638,9 @@ wss.on('connection', (ws) => {
             // 三体线
             观测数据: player.观测数据,
             信号已解码: player.信号已解码,
-            faction: player.faction
+            faction: player.faction,
+            // 扬州赌场掼蛋
+            guandan: player.guandan
           });
           saveUsers();
         }
@@ -1865,9 +2151,146 @@ wss.on('connection', (ws) => {
           } else {
             invMsg += player.inventory.join(', ') + '\n';
           }
+          ensureMoneyState(player);
           invMsg += '\n【负重】' + weight + '/' + player.maxWeight + '\n';
-          invMsg += '【铜钱】' + player.coin + '\n';
+          invMsg += `【资产】${getMoneySummary(player)}\n`;
           ws.send(invMsg + '\n>');
+          break;
+
+        case 'guandan':
+        case '掼蛋':
+          ensureMoneyState(player);
+          if (player.room !== '赌场') {
+            ws.send('这里只能闻到市井烟火，没有正经牌桌。去扬州城赌场再说。\n>');
+            break;
+          }
+          if (!args || args === 'help' || args === '规则') {
+            ws.send(`【扬州赌场·简化掼蛋】
+可用桌级:
+- guandan 铜 100      (100-1000铜钱)
+- guandan 银 1        (1-20银)
+- guandan 金 1        (1-5金)
+
+局内指令:
+- guandan play 序号
+- guandan pass
+- guandan hand
+- guandan quit
+
+当前资产: ${getMoneySummary(player)}
+>`);
+            break;
+          }
+          if (args === 'list' || args === '桌子') {
+            ws.send(`【扬州赌场牌桌】
+铜钱小桌: 100-1000铜钱, 抽水5%
+银两中桌: 1-20银, 抽水8%
+黄金大桌: 1-5金, 抽水10%
+当前资产: ${getMoneySummary(player)}
+>`);
+            break;
+          }
+          if (args === 'hand' || args === '牌' || args === '状态') {
+            if (!player.guandan) ws.send('你现在不在掼蛋局中。\n>');
+            else ws.send(renderGuandanTable(player.guandan, player.name));
+            break;
+          }
+          if (args === 'quit' || args === '离桌') {
+            if (!player.guandan) {
+              ws.send('你本来就没在牌桌上。\n>');
+            } else {
+              player.guandan = null;
+              saveProgress();
+              ws.send(`你起身离开牌桌，底注不退。\n当前资产: ${getMoneySummary(player)}\n>`);
+            }
+            break;
+          }
+          if (args === 'pass' || args === '不要') {
+            if (!player.guandan) {
+              ws.send('你还没开局。\n>');
+              break;
+            }
+            const game = player.guandan;
+            if (game.seats[game.turnIndex] !== player.name) {
+              ws.send('还没轮到你出牌。\n>');
+              break;
+            }
+            if (!game.currentPlay) {
+              ws.send('现在是新一轮，你不能过牌，得先出一手。\n>');
+              break;
+            }
+            game.passCount += 1;
+            game.turnIndex = (game.turnIndex + 1) % game.seats.length;
+            while (game.ranking.includes(game.seats[game.turnIndex]) && game.ranking.length < 4) game.turnIndex = (game.turnIndex + 1) % game.seats.length;
+            const out = `你摆了摆手，选择不要。\n` + advanceGuandan(game, player);
+            saveProgress();
+            ws.send(out);
+            break;
+          }
+          if (args.startsWith('play ')) {
+            if (!player.guandan) {
+              ws.send('你还没开局。\n>');
+              break;
+            }
+            const game = player.guandan;
+            if (game.seats[game.turnIndex] !== player.name) {
+              ws.send('还没轮到你出牌。\n>');
+              break;
+            }
+            const idx = Number(args.substring(5).trim()) - 1;
+            const options = getPlayerGuandanOptions(game, player.name);
+            if (!Number.isInteger(idx) || idx < 0 || idx >= options.length) {
+              ws.send('无效序号，请重新看牌。\n>' );
+              break;
+            }
+            const chosen = options[idx];
+            const nextHand = removeCardsFromHand(game.hands[player.name], chosen.cards);
+            if (!nextHand) {
+              ws.send('系统发现你的手牌状态异常，这手牌打不出去。\n>');
+              break;
+            }
+            game.hands[player.name] = nextHand;
+            game.currentPlay = chosen;
+            game.currentOwner = player.name;
+            game.passCount = 0;
+            let out = `你打出 ${formatPlay(chosen)}。\n`;
+            if (game.hands[player.name].length === 0 && !game.ranking.includes(player.name)) {
+              game.ranking.push(player.name);
+              out += '🎉 你率先出完了手牌。\n';
+            }
+            game.turnIndex = (game.turnIndex + 1) % game.seats.length;
+            while (game.ranking.includes(game.seats[game.turnIndex]) && game.ranking.length < 4) game.turnIndex = (game.turnIndex + 1) % game.seats.length;
+            const finishMsg = maybeFinishGuandanRound(player, game);
+            if (finishMsg) out += finishMsg;
+            else out += advanceGuandan(game, player);
+            saveProgress();
+            ws.send(out);
+            break;
+          }
+          if (player.guandan) {
+            ws.send('你已经在牌桌上了，输入 guandan hand 查看局面。\n>');
+            break;
+          }
+          const parts2 = args.split(/\s+/);
+          const currency = parts2[0];
+          const stake = Number(parts2[1]);
+          const tier = getGuandanTierInfo(currency);
+          if (!tier || !Number.isFinite(stake)) {
+            ws.send('开局格式不对。示例: guandan 铜 100 / guandan 银 1 / guandan 金 1\n>');
+            break;
+          }
+          if (stake < tier.min || stake > tier.max) {
+            ws.send(`${tier.label} 底注范围是 ${tier.min}-${tier.max}${currency}。\n>`);
+            break;
+          }
+          if (!canAffordStake(player, currency, stake)) {
+            ws.send(`你身上钱不够。当前资产: ${getMoneySummary(player)}\n>`);
+            break;
+          }
+          spendStake(player, currency, stake);
+          player.guandan = buildGuandanState(player, currency, stake);
+          saveProgress();
+          ws.send(`荷官一扬手，${tier.label} 已开局，三名牌客入座。\n` + renderGuandanTable(player.guandan, player.name));
           break;
 
         case 'fight':
@@ -2427,9 +2850,10 @@ wss.on('connection', (ws) => {
 ║ 【战斗衍生】                                ║
 ║ 命中: ${player.命中}%  闪避: ${player.闪避}%  暴击: ${player.暴击}%     ║
 ╠══════════════════════════════════════╣
-║ 经验: ${player.exp}  金币: ${player.coin}                      ║
+║ 经验: ${player.exp}                                  ║
 ╚══════════════════════════════════════╝
 `;
+          statusMsg += `资产: ${getMoneySummary(player)}\n`;
           if (player.weapon) statusMsg += `武器: ${player.weapon}(攻击+${weapons[player.weapon].damage})\n`;
           if (player.armor) statusMsg += `防具: ${player.armor}(防御+${armors[player.armor].defense})\n`;
           let skillList = Object.keys(player.skills).join(', ');
@@ -3032,6 +3456,7 @@ shop - 查看商店
 buy [物品] - 购买
 inventory/i - 查看包裹
 fight - 战斗
+guandan - 扬州赌场简化掼蛋
 map - 查看地图 (可用: 扬州/华山/少林/出海/都市/凤栖)
 who/players - 在线玩家
 follow/关注 [玩家] - 关注玩家
