@@ -1380,7 +1380,7 @@ function formatOutput(player, message) {
   output += `根骨:${player.先天.根骨} 悟性:${player.先天.悟性} 经脉:${player.先天.经脉} 福缘:${player.先天.福缘}\n`;
   output += `HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp}\n`;
   output += `攻击:${player.外功攻击} 防御:${player.防御} 身法:${player.身法}\n`;
-  output += `经验:${player.exp} 金币:${player.coin}\n`;
+  output += `经验:${player.exp} 铜钱:${player.coin}\n`;
   if (player.weapon || player.armor) {
     output += `装备: ${player.weapon || '无'}(攻+${weaponDmg}) ${player.armor || '无'}(防+${armorDef})\n`;
   }
@@ -1393,7 +1393,7 @@ wss.on('connection', (ws) => {
   let state = 'welcome';
   let tempName = '';
 
-  ws.send('\n🏯 欢迎来到【武侠世界】MUD！\n\n请选择:\n1. 登录 (login)\n2. 注册 (register)\n> ');
+  ws.send('\n🦞 欢迎来到【武侠世界】MUD！\n\n请选择:\n1. 登录 (login)\n2. 注册 (register)\n> ');
 
   ws.on('error', (err) => {
     console.log(`[WebSocket错误] ${err.message}`);
@@ -2125,7 +2125,7 @@ wss.on('connection', (ws) => {
               saveProgress();
               ws.send(`购买成功！\${args} 已装备。\n>`);
             } else {
-              ws.send('金币不足！\n>');
+              ws.send('铜钱不足！\n>');
             }
           } else if (room2.shop === 'armor' && armors[args]) {
             const itemWeight = armors[args].weight || 0;
@@ -2140,7 +2140,7 @@ wss.on('connection', (ws) => {
               saveProgress();
               ws.send(`购买成功！\${args} 已装备。\n>`);
             } else {
-              ws.send('金币不足！\n>');
+              ws.send('铜钱不足！\n>');
             }
           } else if (room2.shop === 'medicine') {
             if (args === '金创药' && player.coin >= 20) {
@@ -2522,7 +2522,7 @@ wss.on('connection', (ws) => {
 ║           🏆 战斗胜利  🏆              ║
 ╠══════════════════════════════════════╣
 ║  击败了 ${target.name}                    ║
-║  获得金币: ${goldGain}                        ║
+║  获得铜钱: ${goldGain}                        ║
 ║  获得经验: ${expGain}                        ║
 ║  当前经验: ${player.exp}                     ║
 ╚══════════════════════════════════════╝${titleMsg}
@@ -2534,7 +2534,7 @@ wss.on('connection', (ws) => {
 ║           💀 战斗落败  💀              ║
 ╠══════════════════════════════════════╣
 ║  你被 ${player.name} 击败了...            ║
-║  损失金币: 10                       ║
+║  损失铜钱: 10                       ║
 ╚══════════════════════════════════════╝
 `;
                   onlinePlayers[target.name].send(loseLog + '\n>');
@@ -2546,7 +2546,7 @@ wss.on('connection', (ws) => {
 ║           💀 战斗落败  💀              ║
 ╠══════════════════════════════════════╣
 ║  你被 ${target.name} 击败了...            ║
-║  损失金币: 10                       ║
+║  损失铜钱: 10                       ║
 ╚══════════════════════════════════════╝
 `;
                 ws.send(loseLog + '\n>');
@@ -2666,7 +2666,7 @@ wss.on('connection', (ws) => {
 ╔══════════════════════════════════════╗
 ║           🏆 战斗胜利  🏆              ║
 ╠══════════════════════════════════════╣
-║  获得金币: ${goldGain}                        ║
+║  获得铜钱: ${goldGain}                        ║
 ║  获得经验: ${expGain}                        ║
 ║  当前经验: ${player.exp}                     ║
 ╚══════════════════════════════════════╝${titleMsg}
@@ -2678,7 +2678,7 @@ wss.on('connection', (ws) => {
 ║           💀 战斗落败  💀              ║
 ╠══════════════════════════════════════╣
 ║  你身负重伤，仓皇离去...            ║
-║  损失金币: 10                       ║
+║  损失铜钱: 10                       ║
 ╚══════════════════════════════════════╝
 `;
               player.coin = Math.max(0, player.coin - 10);
