@@ -158,15 +158,32 @@
     const resetBtn = document.getElementById('reset-btn');
     
     // ========== 辅助函数 ==========
-    // 所有可点击的方向关键词
     const directionKeywords = ['东', '南', '西', '北', '东北', '东南', '西北', '西南', '上', '下', '前', '后', '左', '右', '进', '出', '入', '返', '回', '去', '来', '折返', '返回'];
     
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function clickableSpan(label, cmd) {
+      return '<span class="clickable-cmd" onclick="sendCmd(' + JSON.stringify(cmd).replace(/"/g, '&quot;') + ')">' + escapeHtml(label) + '</span>';
+    }
+    
     function makeClickable(text) {
-      let result = text;
+      let result = escapeHtml(text);
+      result = result.replace(/出口:\s*([^\n<]+)/g, (full, exitsPart) => {
+        const exits = exitsPart.split('、').map(x => x.trim()).filter(Boolean);
+        const clickable = exits.map(exit => clickableSpan(exit, 'go ' + exit)).join('、');
+        return '出口: ' + clickable;
+      });
       directionKeywords.forEach(dir => {
-        // 匹配独立的方向词（前后不是中文字符）
-        const regex = new RegExp('(' + dir + ')(?![\\u4e00-\\u9fa5])', 'g');
-        result = result.replace(regex, '<span class="clickable-cmd" onclick="sendCmd(\'' + dir + '\')">' + dir + '</span>');
+        const escapedDir = escapeHtml(dir);
+        const regex = new RegExp('(^|[^\\u4e00-\\u9fa5>])(' + escapedDir + ')(?![^<]*>|[\\u4e00-\\u9fa5])', 'g');
+        result = result.replace(regex, (m, prefix, word) => prefix + clickableSpan(word, dir));
       });
       return result;
     }
