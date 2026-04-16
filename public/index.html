@@ -114,6 +114,18 @@
     .player-info { color: #4ecca3; }
     .error { color: #ff6b6b; }
     .prompt { color: #ffd700; }
+    
+    /* 可点击命令样式 */
+    .clickable-cmd {
+      color: #4ecca3;
+      cursor: pointer;
+      text-decoration: underline;
+      margin: 0 3px;
+      transition: color 0.2s;
+    }
+    .clickable-cmd:hover {
+      color: #e94560;
+    }
   </style>
 </head>
 <body>
@@ -139,13 +151,32 @@
     let sessionToken = localStorage.getItem('mud_session');
     let playerName = localStorage.getItem('mud_player');
     let serverVersion = null;
+    let ws = null;
+    let reconnectAttempts = 0;
+    let heartbeatInterval = null;
     const versionBadge = document.getElementById('version-badge');
     const resetBtn = document.getElementById('reset-btn');
     
     // ========== 辅助函数 ==========
+    // 所有可点击的方向关键词
+    const directionKeywords = ['东', '南', '西', '北', '东北', '东南', '西北', '西南', '上', '下', '前', '后', '左', '右', '进', '出', '入', '返', '回', '去', '来', '折返', '返回'];
+    
+    function makeClickable(text) {
+      let result = text;
+      directionKeywords.forEach(dir => {
+        // 匹配独立的方向词（前后不是中文字符）
+        const regex = new RegExp('(' + dir + ')(?![\\u4e00-\\u9fa5])', 'g');
+        result = result.replace(regex, '<span class="clickable-cmd" onclick="sendCmd(\'' + dir + '\')">' + dir + '</span>');
+      });
+      return result;
+    }
+    
     function appendOutput(text, className = '') {
       const div = document.createElement('div');
-      div.textContent = text;
+      
+      // 转换所有方向词为可点击
+      div.innerHTML = makeClickable(text);
+      
       if (className) div.className = className;
       
       // 战斗消息特殊样式
@@ -310,6 +341,15 @@
     input.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') sendCommand();
     });
+    
+    // 全局函数：点击命令执行
+    window.sendCmd = function(cmd) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(cmd);
+        // 显示执行了啥命令
+        appendOutput('> ' + cmd, 'system');
+      }
+    };
 
     input.focus();
   </script>
