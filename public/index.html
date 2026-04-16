@@ -188,6 +188,7 @@
         const clickable = exits.map(exit => clickableSpan(exit, 'go ' + exit)).join('、');
         return '出口: ' + clickable;
       });
+      result = result.replace(/\[play:(\d+)\]/g, (m, num) => clickableSpan('出牌', 'guandan play ' + num));
       // 处理方向关键词
       directionKeywords.forEach(dir => {
         const escapedDir = escapeHtml(dir);

@@ -948,6 +948,7 @@ function createPlayer(name) {
     sleepStartTime: 0,
     // 扬州赌场掼蛋
     guandan: null,
+    guandanStats: { wins: 0, games: 0, streak: 0, bestStreak: 0, profitCopper: 0 },
   };
 }
 
@@ -958,6 +959,7 @@ function ensureMoneyState(player) {
   if (typeof player.silver !== 'number' || Number.isNaN(player.silver)) player.silver = 0;
   if (typeof player.gold !== 'number' || Number.isNaN(player.gold)) player.gold = 0;
   if (!player.guandan) player.guandan = null;
+  if (!player.guandanStats) player.guandanStats = { wins: 0, games: 0, streak: 0, bestStreak: 0, profitCopper: 0 };
 }
 
 function getMoneySummary(player) {
@@ -989,9 +991,37 @@ function addStake(player, currency, amount) {
 }
 
 function getGuandanTierInfo(currency) {
-  if (currency === '铜') return { min: 100, max: 1000, feePercent: 5, label: '铜钱小桌' };
-  if (currency === '银') return { min: 1, max: 20, feePercent: 8, label: '银两中桌' };
-  if (currency === '金') return { min: 1, max: 5, feePercent: 10, label: '黄金大桌' };
+  if (currency === '铜') return { min: 100, max: 1000, feePercent: 5, label: '铜钱小桌', difficulty: '普通' };
+  if (currency === '银') return { min: 1, max: 20, feePercent: 8, label: '银两中桌', difficulty: '进阶' };
+  if (currency === '金') return { min: 1, max: 5, feePercent: 10, label: '黄金大桌', difficulty: '高手' };
+  return null;
+}
+
+function toCopperValue(currency, amount) {
+  if (currency === '铜') return amount;
+  if (currency === '银') return amount * 100;
+  if (currency === '金') return amount * 10000;
+  return 0;
+}
+
+function updateGuandanStats(player, game, pos, gross) {
+  ensureMoneyState(player);
+  player.guandanStats.games += 1;
+  player.guandanStats.profitCopper += toCopperValue(game.currency, gross);
+  if (pos === 1) {
+    player.guandanStats.wins += 1;
+    player.guandanStats.streak += 1;
+    player.guandanStats.bestStreak = Math.max(player.guandanStats.bestStreak, player.guandanStats.streak);
+  } else {
+    player.guandanStats.streak = 0;
+  }
+}
+
+function getStreakReward(player, currency) {
+  const streak = player.guandanStats?.streak || 0;
+  if (streak === 3) return { currency, amount: 1, text: '连胜三场，荷官赏你一手彩头。' };
+  if (streak === 5) return { currency, amount: 2, text: '连胜五场，赌场掌柜亲自加码。' };
+  if (streak === 10) return { currency, amount: 5, text: '连胜十场，满堂喝彩，彩金翻涌而来。' };
   return null;
 }
 
@@ -1104,19 +1134,23 @@ function formatPlay(play) {
 
 function buildGuandanState(player, currency, stake) {
   const deck = shuffle(createDeck());
+  const tier = getGuandanTierInfo(currency);
   const seats = [player.name, '牌桌老李', '牌桌老周', '牌桌老孙'];
-  const aiProfiles = {
+  let aiProfiles = {
     '牌桌老李': '保守',
     '牌桌老周': '激进',
     '牌桌老孙': '均衡'
   };
+  if (tier.difficulty === '进阶') aiProfiles = { '牌桌老李': '控牌', '牌桌老周': '激进', '牌桌老孙': '均衡' };
+  if (tier.difficulty === '高手') aiProfiles = { '牌桌老李': '控牌', '牌桌老周': '炸弹流', '牌桌老孙': '均衡' };
   const hands = {};
   for (const seat of seats) hands[seat] = sortCards(deck.splice(0, 27));
   return {
     currency,
     stake,
     pot: stake * 4,
-    feePercent: getGuandanTierInfo(currency).feePercent,
+    feePercent: tier.feePercent,
+    difficulty: tier.difficulty,
     seats,
     hands,
     turnIndex: 0,
@@ -1139,7 +1173,7 @@ function renderGuandanTable(game, playerName) {
   const hand = sortCards(game.hands[playerName] || []);
   const options = getPlayerGuandanOptions(game, playerName);
   game.options = options;
-  let msg = `\n【扬州赌场·简化掼蛋】\n桌级:${getGuandanTierInfo(game.currency).label} 底注:${game.stake}${game.currency}\n奖池:${game.pot}${game.currency} 抽水:${game.feePercent}%\n当前牌面:${formatPlay(game.currentPlay)}\n\n`;
+  let msg = `\n【扬州赌场·简化掼蛋】\n桌级:${getGuandanTierInfo(game.currency).label} (${game.difficulty}) 底注:${game.stake}${game.currency}\n奖池:${game.pot}${game.currency} 抽水:${game.feePercent}%\n当前牌面:${formatPlay(game.currentPlay)}\n\n`;
   msg += `名次:${game.ranking.length ? game.ranking.join(' -> ') : '尚未决出'}\n`;
   msg += `\n【你的手牌】\n${hand.join(' ')}\n`;
   msg += `\n【桌上余牌】\n`;
@@ -1152,7 +1186,7 @@ function renderGuandanTable(game, playerName) {
   }
   msg += `\n【可出选项】\n`;
   if (!options.length) msg += '无可压牌，请输入 guandan pass\n';
-  else options.forEach((p, i) => { msg += `${i + 1}. ${formatPlay(p)}\n`; });
+  else options.forEach((p, i) => { msg += `${i + 1}. ${formatPlay(p)} [play:${i + 1}]\n`; });
   msg += '\n指令: guandan play 序号 | guandan pass | guandan hand | guandan quit\n>';
   return msg;
 }
@@ -1177,6 +1211,13 @@ function maybeFinishGuandanRound(player, game) {
     } else {
       msg += `本局失利，已扣除底注:${game.stake}${game.currency}\n`;
     }
+    updateGuandanStats(player, game, pos, gross);
+    const reward = pos === 1 ? getStreakReward(player, game.currency) : null;
+    if (reward) {
+      addStake(player, reward.currency, reward.amount);
+      msg += `${reward.text} 额外奖励:${reward.amount}${reward.currency}\n`;
+    }
+    msg += `掼蛋战绩: ${player.guandanStats.wins}胜/${player.guandanStats.games}局，当前连胜:${player.guandanStats.streak}，最佳连胜:${player.guandanStats.bestStreak}\n`;
     msg += `当前资产: ${getMoneySummary(player)}\n>`;
     player.guandan = null;
     return msg;
@@ -1202,12 +1243,12 @@ function advanceGuandan(game, player) {
     let selected = null;
     if (!game.currentPlay) {
       if (profile === '激进') selected = options[0] || null;
-      else if (profile === '保守') selected = options.find(p => p.type !== 'bomb' && p.type !== 'jokerbomb') || options[0] || null;
+      else if (profile === '保守' || profile === '控牌') selected = options.find(p => p.type !== 'bomb' && p.type !== 'jokerbomb') || options[0] || null;
       else selected = options.find(p => p.type === 'pair' || p.type === 'triple') || options[0] || null;
     } else {
       const sameType = options.filter(p => p.type === game.currentPlay.type && p.cards.length === game.currentPlay.cards.length);
-      if (profile === '激进') selected = sameType[0] || options.find(p => p.type === 'bomb' || p.type === 'jokerbomb') || null;
-      else if (profile === '保守') selected = sameType[0] || null;
+      if (profile === '激进' || profile === '炸弹流') selected = sameType[0] || options.find(p => p.type === 'bomb' || p.type === 'jokerbomb') || null;
+      else if (profile === '保守' || profile === '控牌') selected = sameType[0] || null;
       else selected = sameType[0] || options.find(p => p.type === 'bomb' || p.type === 'jokerbomb') || null;
     }
     if (!selected) {
@@ -1615,6 +1656,7 @@ wss.on('connection', (ws) => {
             // 基本属性
             exp: player.exp, level: player.level, coin: player.coin,
             silver: player.silver, gold: player.gold,
+            guandanStats: player.guandanStats,
             hp: player.hp, mp: player.mp,
             maxHp: player.maxHp, maxMp: player.maxMp,
             // 晕倒状态
@@ -2201,11 +2243,29 @@ wss.on('connection', (ws) => {
           }
           if (args === 'list' || args === '桌子') {
             ws.send(`【扬州赌场牌桌】
-铜钱小桌: 100-1000铜钱, 抽水5%
-银两中桌: 1-20银, 抽水8%
-黄金大桌: 1-5金, 抽水10%
+铜钱小桌: 100-1000铜钱, 抽水5%, 难度普通
+银两中桌: 1-20银, 抽水8%, 难度进阶
+黄金大桌: 1-5金, 抽水10%, 难度高手
 当前资产: ${getMoneySummary(player)}
 >`);
+            break;
+          }
+          if (args === 'rank' || args === '排行' || args === '榜') {
+            const allUsers = Object.entries(users).map(([name, u]) => ({
+              name,
+              wins: u.guandanStats?.wins || 0,
+              games: u.guandanStats?.games || 0,
+              streak: u.guandanStats?.streak || 0,
+              bestStreak: u.guandanStats?.bestStreak || 0,
+              profitCopper: u.guandanStats?.profitCopper || 0,
+            }));
+            const byProfit = [...allUsers].sort((a, b) => b.profitCopper - a.profitCopper).slice(0, 10);
+            let rankMsg = '【扬州赌场·掼蛋榜】\n盈利榜 Top10\n';
+            byProfit.forEach((u, i) => {
+              rankMsg += `${i + 1}. ${u.name} 盈利:${u.profitCopper}铜 胜场:${u.wins}/${u.games} 最佳连胜:${u.bestStreak}\n`;
+            });
+            rankMsg += `\n你的战绩: ${player.guandanStats.wins}胜/${player.guandanStats.games}局, 当前连胜:${player.guandanStats.streak}, 最佳连胜:${player.guandanStats.bestStreak}, 盈利:${player.guandanStats.profitCopper}铜\n>`;
+            ws.send(rankMsg);
             break;
           }
           if (args === 'hand' || args === '牌' || args === '状态') {
