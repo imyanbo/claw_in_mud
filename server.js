@@ -2086,7 +2086,7 @@ wss.on('connection', (ws) => {
             player.room = r.exits[goArgs];
             saveProgress();
             broadcastRoomArrival(player, player.room);
-            ws.send(formatOutput(player, '你走进了' + player.room));
+            ws.send(formatOutputBrief(player, '你走进了' + player.room));
           } else {
             const exits = r ? Object.keys(r.exits).join(',') : '';
             ws.send('你找不到这个方向的路。可用: ' + exits);
