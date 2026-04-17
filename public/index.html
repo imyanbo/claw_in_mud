@@ -159,7 +159,7 @@
     
     // ========== 辅助函数 ==========
     const directionKeywords = ['东', '南', '西', '北', '东北', '东南', '西北', '西南', '上', '下', '前', '后', '左', '右', '进', '出', '入', '返', '回', '去', '来', '折返', '返回'];
-    const placeKeywords = ['赌场', '客栈', '武馆', '镖局', '药店', '铁匠铺', '杂货铺']; // 可点击的地名
+    const placeKeywords = ['铁匠铺', '杂货铺', '赌场', '武馆', '镖局', '药店', '客栈']; // 可点击的地名
     const npcPromptTemplate = 'ask __NPC__ about '; 
     
     function escapeHtml(text) {
@@ -180,7 +180,7 @@
       // 优先处理地点关键词（精确匹配）
       placeKeywords.forEach(place => {
         const escapedPlace = escapeHtml(place);
-        const regex = new RegExp('(' + escapedPlace + ')', 'g');
+        const regex = new RegExp('(^|[^\u4e00-\u9fa5])(' + escapedPlace + ')(?![\u4e00-\u9fa5])', 'g');
         result = result.replace(regex, clickableSpan(place, 'go ' + place));
       });
       result = result.replace(/([\u4e00-\u9fa5]+)（([a-zA-Z0-9_]+)）/g, (full, cn, en) => {
