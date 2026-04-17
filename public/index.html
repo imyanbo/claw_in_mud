@@ -160,6 +160,7 @@
     // ========== 辅助函数 ==========
     const directionKeywords = ['东', '南', '西', '北', '东北', '东南', '西北', '西南', '上', '下', '前', '后', '左', '右', '进', '出', '入', '返', '回', '去', '来', '折返', '返回'];
     const placeKeywords = ['赌场', '客栈', '武馆', '镖局', '药店', '铁匠铺', '杂货铺']; // 可点击的地名
+    const npcPromptTemplate = 'ask __NPC__ about '; 
     
     function escapeHtml(text) {
       return text
@@ -181,6 +182,9 @@
         const escapedPlace = escapeHtml(place);
         const regex = new RegExp('(' + escapedPlace + ')', 'g');
         result = result.replace(regex, clickableSpan(place, 'go ' + place));
+      });
+      result = result.replace(/([\u4e00-\u9fa5]+)（([a-zA-Z0-9_]+)）/g, (full, cn, en) => {
+        return '<span class="clickable-cmd" onclick="prepareAskNpc(' + JSON.stringify(cn).replace(/"/g, '&quot;') + ')">' + escapeHtml(cn) + '</span>（' + escapeHtml(en) + '）';
       });
       // 处理出口描述中的地点
       result = result.replace(/出口:\s*([^\n<]+)/g, (full, exitsPart) => {
@@ -376,6 +380,12 @@
         // 显示执行了啥命令
         appendOutput('> ' + cmd, 'system');
       }
+    };
+
+    window.prepareAskNpc = function(npcName) {
+      input.value = npcPromptTemplate.replace('__NPC__', npcName);
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
     };
 
     input.focus();
