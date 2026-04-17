@@ -25,6 +25,10 @@ function getUptime() {
 db.initDatabase();
 db.invalidateAllSessionsForVersionMismatch();
 
+console.log(`[启动检查] 工作目录: ${process.cwd()}`);
+console.log(`[启动检查] users.json 路径: ${require('path').resolve('./users.json')}`);
+console.log(`[启动检查] mud.db 路径: ${require('path').resolve('./mud.db')}`);
+
 const APP_VERSION = db.APP_VERSION;
 const INSTANCE_ID = `${os.hostname()}-${process.pid}`;
 
@@ -60,12 +64,26 @@ try {
   console.log('无法读取用户数据');
 }
 
+const jsonUserCount = users && typeof users === 'object' ? Object.keys(users).length : 0;
 const importedCount = db.migrateFromJsonUsers(users);
 if (importedCount > 0) {
   console.log(`Migrated ${importedCount} users from users.json into SQLite`);
 }
 
-users = Object.fromEntries(db.getAllUsers().map((user) => [user.name, user]));
+const sqliteUsers = db.getAllUsers();
+const sqliteUserCount = sqliteUsers.length;
+
+if (jsonUserCount > 0 && sqliteUserCount === 0) {
+  console.warn(`[数据风险] 检测到 users.json 有 ${jsonUserCount} 个用户，但 SQLite 中为 0。请确认部署目录是否正确，避免老用户数据丢失。`);
+}
+if (jsonUserCount === 0 && sqliteUserCount === 0) {
+  console.warn('[数据风险] users.json 与 SQLite 都为空。如果这是线上环境，请立即检查是否误用了新空目录或新空库。');
+}
+if (jsonUserCount > 20 && importedCount === 0 && sqliteUserCount > 0) {
+  console.warn(`[数据检查] users.json 中有 ${jsonUserCount} 个用户，SQLite 当前有 ${sqliteUserCount} 个用户，本次未发生迁移。若这是新部署，请确认 SQLite 是否已包含完整老数据。`);
+}
+
+users = Object.fromEntries(sqliteUsers.map((user) => [user.name, user]));
 
 function reloadUsersFromDb() {
   users = Object.fromEntries(db.getAllUsers().map((user) => [user.name, user]));
@@ -3570,6 +3588,20 @@ ETO组织正在为"他们"的到来做准备...
           ws.send(`\n${randomTip}\n`);
           break;
 
+        case 'datacheck':
+        case '数据检查':
+          const jsonExists = fs.existsSync(usersFile);
+          let jsonCount = 0;
+          try {
+            if (jsonExists) {
+              const raw = JSON.parse(fs.readFileSync(usersFile, 'utf8'));
+              jsonCount = raw && typeof raw === 'object' ? Object.keys(raw).length : 0;
+            }
+          } catch (e) {}
+          const sqliteCount = db.getAllUsers().length;
+          ws.send(`【数据检查】\n工作目录: ${process.cwd()}\nusers.json: ${require('path').resolve(usersFile)}\nmud.db: ${require('path').resolve('./mud.db')}\nusers.json 用户数: ${jsonCount}\nSQLite 用户数: ${sqliteCount}\n若线上老玩家丢失，请优先检查部署目录和旧数据文件是否延续。\n>`);
+          break;
+
         case 'help':
           ws.send(`【指令帮助】
 look/l - 查看房间
@@ -3597,6 +3629,7 @@ follows - 关注列表
 quest - 查看任务进度
 find [NPC] - 寻找NPC线索
 hint - 获取弱提示(卡关时使用)
+datacheck - 检查 users.json / mud.db 用户数
 help - 帮助
 > `);
           break;
