@@ -1,7 +1,7 @@
 const Database = require('better-sqlite3');
 const crypto = require('crypto');
 
-const db = new Database('./mud.db');
+const db = new Database(__dirname + '/mud.db');
 
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');

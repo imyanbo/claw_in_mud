@@ -41,7 +41,7 @@ app.get('/api/version', (req, res) => {
   });
 });
 
-app.use(express.static('public', {
+app.use(express.static(__dirname + '/public', {
   etag: true,
   lastModified: true,
   setHeaders(res, filePath) {
