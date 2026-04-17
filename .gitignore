@@ -2,3 +2,5 @@ node_modules/
 users.json
 *.log
 .DS_Store
+config/*.json
+!config/*.example.json
