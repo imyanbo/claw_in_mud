@@ -2,13 +2,13 @@
   "enabled": false,
   "timeoutMs": 12000,
   "provider": {
-    "type": "openai-compatible",
-    "baseURL": "https://api.openai.com/v1",
-    "apiKey": "请填写你自己的API Key，不要提交到Git",
-    "model": "gpt-4o-mini"
+    "type": "anthropic-compatible",
+    "baseURL": "https://api.minimaxi.com/anthropic",
+    "apiKey": "请填写你自己的 Token Plan / API Key，不要提交到Git",
+    "model": "MiniMax-M2.7-highspeed"
   },
   "npcDefaults": {
     "maxTokens": 220,
-    "temperature": 0.9
+    "temperature": 1
   }
 }

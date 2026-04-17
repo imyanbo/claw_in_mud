@@ -8,14 +8,14 @@ const defaultConfig = {
   enabled: false,
   timeoutMs: 12000,
   provider: {
-    type: 'openai-compatible',
-    baseURL: 'https://api.openai.com/v1',
+    type: 'anthropic-compatible',
+    baseURL: 'https://api.minimaxi.com/anthropic',
     apiKey: '',
-    model: 'gpt-4o-mini'
+    model: 'MiniMax-M2.7-highspeed'
   },
   npcDefaults: {
     maxTokens: 220,
-    temperature: 0.9
+    temperature: 1
   }
 };
 
@@ -96,19 +96,28 @@ async function chatWithNpc({ npcMeta, room, playerName, action, topic, userInput
   const timer = setTimeout(() => controller.abort(), runtime.timeoutMs);
 
   try {
-    const response = await fetch(`${provider.baseURL.replace(/\/$/, '')}/chat/completions`, {
+    const response = await fetch(`${provider.baseURL.replace(/\/$/, '')}/v1/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${provider.apiKey}`
+        'x-api-key': provider.apiKey,
+        'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
         model: provider.model,
+        system: systemPrompt,
         temperature: runtime.temperature,
         max_tokens: runtime.maxTokens,
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: userPrompt
+              }
+            ]
+          }
         ]
       }),
       signal: controller.signal
@@ -121,7 +130,9 @@ async function chatWithNpc({ npcMeta, room, playerName, action, topic, userInput
     }
 
     const data = await response.json();
-    const text = data?.choices?.[0]?.message?.content?.trim();
+    const text = Array.isArray(data?.content)
+      ? data.content.filter(block => block?.type === 'text' && block?.text).map(block => block.text).join('\n').trim()
+      : '';
     return text || null;
   } catch (error) {
     console.warn('[LLM NPC] 调用失败:', error.message);
