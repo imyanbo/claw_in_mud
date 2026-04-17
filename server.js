@@ -1529,6 +1529,37 @@ function getHpStatus(hp, maxHp) {
   return "奄奄一息";
 }
 
+function getArrivalPrefix(hp, maxHp) {
+  const percent = Math.round((hp / maxHp) * 100);
+  if (percent >= 80) return '';
+  if (percent >= 60) return '气息稍乱地';
+  if (percent >= 40) return '略显疲惫地';
+  if (percent >= 20) return '脚步虚浮地';
+  if (percent >= 10) return '摇摇欲坠地';
+  return '奄奄一息地艰难';
+}
+
+function formatArrival(name, hp, maxHp) {
+  const prefix = getArrivalPrefix(hp, maxHp);
+  return prefix ? `${name}${prefix}走了过来` : `${name}走了过来`;
+}
+
+function broadcastRoomArrival(arriver, roomName) {
+  for (const [name, client] of Object.entries(onlinePlayers)) {
+    if (name === arriver.name) continue;
+    const targetPlayer = users[name];
+    if (!targetPlayer || targetPlayer.room !== roomName) continue;
+    client.send(`【系统】${formatArrival(arriver.name, arriver.hp, arriver.maxHp)}。\n>`);
+  }
+}
+
+function getNpcCurrentRoom(npcName) {
+  for (const [roomName, room] of Object.entries(rooms)) {
+    if ((room.npcs || []).includes(npcName)) return roomName;
+  }
+  return null;
+}
+
 // 生成玩家描述
 function getPlayerDescription(targetPlayer) {
   const p = targetPlayer;
@@ -1563,7 +1594,7 @@ function formatOutputBrief(player, message) {
     // 显示同房间的其他玩家
     const playersInRoom = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
     if (playersInRoom.length > 0) {
-      output += `你看到: ${playersInRoom.map(p => `${p.name}${getHpStatus(p.hp, p.maxHp)}走了过来`).join('、')}\n`;
+      output += `你看到: ${playersInRoom.map(p => formatArrival(p.name, p.hp, p.maxHp)).join('、')}\n`;
     }
     if (room.npcs.length > 0) {
       output += `你看到: ${formatNpcList(room.npcs)}\n`;
@@ -1586,7 +1617,7 @@ function formatOutput(player, message) {
     // 显示同房间的其他玩家
     const playersInRoom = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
     if (playersInRoom.length > 0) {
-      output += `你看到: ${playersInRoom.map(p => `${p.name}${getHpStatus(p.hp, p.maxHp)}走了过来`).join('、')}\n`;
+      output += `你看到: ${playersInRoom.map(p => formatArrival(p.name, p.hp, p.maxHp)).join('、')}\n`;
     }
     if (room.npcs.length > 0) {
       output += `你看到: ${formatNpcList(room.npcs)}\n`;
@@ -2054,6 +2085,7 @@ wss.on('connection', (ws) => {
           if (r && r.exits[goArgs]) {
             player.room = r.exits[goArgs];
             saveProgress();
+            broadcastRoomArrival(player, player.room);
             ws.send(formatOutput(player, '你走进了' + player.room));
           } else {
             const exits = r ? Object.keys(r.exits).join(',') : '';
@@ -2066,14 +2098,17 @@ wss.on('connection', (ws) => {
           if (player.room === '扬州码头') {
             player.room = '远洋客轮甲板';
             saveProgress();
+            broadcastRoomArrival(player, player.room);
             ws.send('你登上了远洋客轮...\n\n' + formatOutputBrief(player, player.room));
           } else if (player.room === '枫林渡口') {
             player.room = '凤栖城码头';
             saveProgress();
+            broadcastRoomArrival(player, player.room);
             ws.send('你登上渡船，前往凤栖城...\n\n' + formatOutputBrief(player, player.room));
           } else if (args === 'ship' && player.room === '扬州码头') {
             player.room = '远洋客轮甲板';
             saveProgress();
+            broadcastRoomArrival(player, player.room);
             ws.send('你登上了远洋客轮...\n\n' + formatOutputBrief(player, player.room));
           } else {
             ws.send('这里没有船可以登。\n>');
@@ -2083,25 +2118,25 @@ wss.on('connection', (ws) => {
         case 'n':
         case 'north':
         case '北':
-          if (movePlayer(player, '北')) { saveProgress(); ws.send(formatOutputBrief(player, '你向北走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('北边没有路。可用: ' + exits); } break;
+          if (movePlayer(player, '北')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向北走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('北边没有路。可用: ' + exits); } break;
         case 's':
         case 'south':
         case '南':
-          if (movePlayer(player, '南')) { saveProgress(); ws.send(formatOutputBrief(player, '你向南走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('南边没有路。可用: ' + exits); } break;
+          if (movePlayer(player, '南')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向南走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('南边没有路。可用: ' + exits); } break;
         case 'e':
         case 'east':
         case '东':
-          if (movePlayer(player, '东')) { saveProgress(); ws.send(formatOutputBrief(player, '你向东走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('东边没有路。可用: ' + exits); } break;
+          if (movePlayer(player, '东')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向东走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('东边没有路。可用: ' + exits); } break;
         case 'w':
         case 'west':
         case '西':
-          if (movePlayer(player, '西')) { saveProgress(); ws.send(formatOutputBrief(player, '你向西走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('西边没有路。可用: ' + exits); } break;
+          if (movePlayer(player, '西')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向西走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('西边没有路。可用: ' + exits); } break;
         case 'u':
         case 'up':
-        case '上': if (movePlayer(player, '上')) { saveProgress(); ws.send(formatOutputBrief(player, '你向上走去')); } else ws.send('上面没有路。'); break;
+        case '上': if (movePlayer(player, '上')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向上走去')); } else ws.send('上面没有路。'); break;
         case 'd':
         case 'down':
-        case '下': if (movePlayer(player, '下')) { saveProgress(); ws.send(formatOutputBrief(player, '你向下走去')); } else ws.send('下面没有路。'); break;
+        case '下': if (movePlayer(player, '下')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向下走去')); } else ws.send('下面没有路。'); break;
 
         case 'eat':
         case '使用':
@@ -3109,6 +3144,39 @@ wss.on('connection', (ws) => {
             whoMsg += `共 ${onlineList.length} 人在线\n`;
           }
           ws.send(whoMsg + '\n>');
+          break;
+
+        case 'where':
+        case '在哪':
+        case '位置':
+          if (!args) {
+            ws.send('用法: where 名称\n>');
+            break;
+          }
+          const onlineTarget = db.listOnlinePlayers().find(p => p.user_name === args);
+          if (onlineTarget) {
+            ws.send(`${args}正在${onlineTarget.room || '未知地点'}。\n>`);
+            break;
+          }
+          const npcRoom = getNpcCurrentRoom(args);
+          if (npcRoom) {
+            ws.send(`${args}正在${npcRoom}。\n>`);
+            break;
+          }
+          const npcAliasMatch = Object.entries(npcCatalog).find(([name, meta]) => args === meta.alias);
+          if (npcAliasMatch) {
+            const npcRoomByAlias = getNpcCurrentRoom(npcAliasMatch[0]);
+            if (npcRoomByAlias) {
+              ws.send(`${npcAliasMatch[0]}正在${npcRoomByAlias}。\n>`);
+              break;
+            }
+          }
+          const userMatch = users[args];
+          if (userMatch?.room) {
+            ws.send(`${args}正在${userMatch.room}。\n>`);
+            break;
+          }
+          ws.send('查不到这个人或NPC的位置。\n>');
           break;
 
         // 英雄榜系统
