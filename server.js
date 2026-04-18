@@ -134,6 +134,12 @@ function restorePlayerFromStoredData(name, storedData) {
   if (storedData.先天) {
     p.先天 = storedData.先天;
   }
+  if (storedData.npcRelations && typeof storedData.npcRelations === 'object') {
+    for (const [npcName, relation] of Object.entries(storedData.npcRelations)) {
+      if (!npcPlayerState[npcName]) npcPlayerState[npcName] = {};
+      npcPlayerState[npcName][name] = { ...relation };
+    }
+  }
   normalizeCombatState(p);
   p.title = getTitle(p.exp);
   return p;
@@ -1031,6 +1037,9 @@ function createPlayer(name) {
 const onlinePlayers = {};
 
 const npcDrops = {};
+const importantNpcNames = new Set(['老鸨', '情报贩子', '黄药师', '六扇门捕头']);
+const npcPlayerState = {};
+const npcMoodState = {};
 
 function getNpcMeta(name) {
   return npcCatalog[name] || { alias: name.toLowerCase().replace(/\s+/g, '_'), quote: '……', money: 0, loot: [], role: '江湖人物' };
@@ -1177,8 +1186,20 @@ async function getNpcDialogue({ npcName, player, action, topic, userInput }) {
   const npcMeta = getNpcMeta(npcName);
   const roomName = getRoomByNpcName(npcName) || player.room;
   const room = getRoom(roomName) || { name: roomName, description: '' };
+  const relation = getNpcPlayerState(npcName, player.name);
+  const mood = touchNpcMood(npcName)?.mood || '平静';
+  const attitudeLine = getNpcAttitudeLine(npcName, player);
   const generated = await chatWithNpc({
-    npcMeta: { ...npcMeta, name: npcName },
+    npcMeta: {
+      ...npcMeta,
+      name: npcName,
+      currentMood: mood,
+      relation,
+      attitudeLine,
+      hiddenGoals: importantNpcNames.has(npcName)
+        ? ['观察玩家是否可靠', '必要时只说半真半假的话', '尽量把玩家卷入自己的局']
+        : []
+    },
     room: { name: roomName, description: room.description || '' },
     playerName: player.name,
     action,
@@ -1188,12 +1209,32 @@ async function getNpcDialogue({ npcName, player, action, topic, userInput }) {
   if (generated) return generated;
 
   if (action === 'ask' && npcName === '老鸨') {
+    if (player.questProgress?.laobaoMessageQuest?.stage === 'done') return '老鸨轻晃团扇，低笑道：「上回那桩递消息的事，你办得不坏。以后再有这种风声，我会先想起你。」';
+    if (relation.favor >= 3) return `老鸨压低声音说道：「${topic}这事，我能多告诉你一句，不过你可别转头就把我卖了。」`;
+    if (/秘密|把柄|黑市|码头|可疑/.test(topic)) return `老鸨眯起眼，压低声音说道：「${topic}这事啊，我倒是听过些风声。不过你若连茶水钱都不肯出，我最多只能说个半真半假。」`;
     return `老鸨眯起眼，压低声音说道：「${topic}这事啊，我这儿倒听过几耳朵。不过消息分轻重，茶水钱到了，我就多说两句。」`;
   }
   if (action === 'talk' && npcName === '老鸨') {
     return `老鸨满脸堆笑地说道：「客官来得巧，丽春院有酒有消息，想听热闹还是想做生意？银子到位，什么都好说。」${getNpcVendorText(npcMeta)}`;
   }
-  return npcMeta.quote;
+  if (action === 'talk' && npcName === '情报贩子') {
+    return relation.trust >= 3 ? '情报贩子把声音压得极低：「你若还想听更深的，就得替我先办一件事。」' : '情报贩子冷笑一声：「消息我有，价钱也有，就看你买不买得起。便宜话我这里没有，假消息倒是看人送。」';
+  }
+  if (action === 'talk' && npcName === '黄药师') {
+    return relation.favor >= 2 || (player.先天?.悟性 || 0) >= 8 ? '黄药师淡淡说道：「你若真有几分悟性，我倒不介意再听你多说两句。」' : '黄药师负手而立，冷冷道：「空口白话最是无趣，你若无真才实学，少来烦我。」';
+  }
+  if (action === 'talk' && npcName === '六扇门捕头') {
+    if (player.questProgress?.dockCaseQuest?.stage === 'done') return '六扇门捕头点了点头：「上回码头那事，你做得还算稳当。以后若还有难办的案子，我会再找你。」';
+    return relation.trust >= 2 ? '六扇门捕头沉声道：「你这人还算有点分寸。若肯帮我盯一盯码头那几个生面孔，城里的事我可以多告诉你一些。」' : '六扇门捕头目光沉稳：「若没正事，就别在公门口多转悠。」';
+  }
+  if (action === 'inquire' && npcName === '情报贩子') {
+    if (relation.suspicion >= 2) return '情报贩子眯起眼道：「你问得太细了。再问下去，我就得怀疑你到底替谁做事。」';
+    if (/黑市|码头|秘密|身份/.test(topic || '')) return '情报贩子轻轻一笑：「这话题值钱，我今天最多给你半句真话。真想知道全的，拿诚意来换。」';
+  }
+  if (action === 'inquire' && npcName === '六扇门捕头') {
+    if (/通缉|可疑|案/.test(topic || '')) return relation.trust >= 2 ? '六扇门捕头压低声音道：「这案子我还在查，你若真想插手，就先替我盯紧扬州码头。」' : '六扇门捕头冷冷道：「案情未明，不该你知道的就别多问。」';
+  }
+  return `${attitudeLine ? `${attitudeLine} ` : ''}${npcMeta.quote}`;
 }
 
 function formatNpcName(name) {
@@ -1229,6 +1270,88 @@ function ensureNpcDrop(roomName, npcName) {
     };
   }
   return npcDrops[key];
+}
+
+function getNpcPlayerState(npcName, playerName) {
+  if (!npcPlayerState[npcName]) npcPlayerState[npcName] = {};
+  if (!npcPlayerState[npcName][playerName]) {
+    npcPlayerState[npcName][playerName] = {
+      trust: 0,
+      favor: 0,
+      suspicion: 0,
+      hostility: 0,
+      owedFavor: 0,
+      lastTopic: null,
+      lastSeenAt: 0,
+      lastAction: null
+    };
+  }
+  return npcPlayerState[npcName][playerName];
+}
+
+function touchNpcMood(npcName) {
+  if (!importantNpcNames.has(npcName)) return null;
+  const now = Date.now();
+  const current = npcMoodState[npcName];
+  if (current && now - current.updatedAt < 20 * 60 * 1000) return current;
+  const moods = ['热情', '戒备', '不耐烦', '试探', '有求于人'];
+  const mood = moods[Math.floor(Math.random() * moods.length)];
+  npcMoodState[npcName] = { mood, updatedAt: now };
+  return npcMoodState[npcName];
+}
+
+function noteNpcInteraction(npcName, player, action, extra = {}) {
+  if (!importantNpcNames.has(npcName)) return;
+  const state = getNpcPlayerState(npcName, player.name);
+  state.lastSeenAt = Date.now();
+  state.lastAction = action;
+  if (extra.topic) state.lastTopic = extra.topic;
+  if (action === 'talk') state.favor += 1;
+  if (action === 'ask') state.trust += 1;
+  if (action === 'inquire') state.suspicion += extra.sensitive ? 1 : 0;
+  if (action === 'fight') state.hostility += 3;
+  if (action === 'gift') state.favor += 2;
+}
+
+function getNpcAttitudeLine(npcName, player) {
+  if (!importantNpcNames.has(npcName)) return '';
+  const state = getNpcPlayerState(npcName, player.name);
+  const mood = touchNpcMood(npcName)?.mood || '平静';
+  if (state.hostility >= 3) return `${npcName}看向你的眼神里带着毫不掩饰的敌意。`;
+  if (state.suspicion >= 2) return `${npcName}语气平平，却明显还在提防你。`;
+  if (state.favor >= 3 || state.trust >= 3) return `${npcName}见你来了，神色明显比待旁人亲近几分。`;
+  if (mood === '不耐烦') return `${npcName}今天像是心气不顺，说话都短了几分。`;
+  if (mood === '试探') return `${npcName}像是在掂量你的来路，话里总留着半截。`;
+  if (mood === '有求于人') return `${npcName}似乎正有事压在心里，眼神时不时落在你身上。`;
+  return '';
+}
+
+function getNpcProactiveLine(npcName, player) {
+  if (!importantNpcNames.has(npcName)) return '';
+  const state = getNpcPlayerState(npcName, player.name);
+  const mood = touchNpcMood(npcName)?.mood || '平静';
+  const qp = player.questProgress || {};
+  if (npcName === '老鸨') {
+    if (qp.laobaoMessageQuest?.stage === 'started') return '老鸨眼波一转，轻声道：「你若真想知道谁在院里递消息，就别只会听，得学会看人。」';
+    if (state.favor >= 3) return '老鸨笑着招手道：「熟客来了，今儿有两桩新鲜事，你若想听，我给你留一半真话。」';
+    if (mood === '戒备') return '老鸨先四下看了看，这才压低声音道：「今儿风声紧，想听消息，先把手脚放干净些。」';
+    return '老鸨甩了甩手帕，笑吟吟道：「客官，想听热闹，还是想买消息？」';
+  }
+  if (npcName === '情报贩子') {
+    if (state.trust >= 3) return '情报贩子朝你勾了勾手指：「你来得巧，我手里有条消息，旁人我还不想卖。」';
+    if (mood === '试探') return '情报贩子眯眼打量你：「消息有的是，就看你值不值得我开口。」';
+    return '情报贩子指尖轻敲桌面：「过了今晚，有些消息可就不是这个价了。」';
+  }
+  if (npcName === '黄药师') {
+    if (state.favor >= 2) return '黄药师冷冷看你一眼：「比上回强了点，至少没那么不堪入目。」';
+    return '黄药师拂袖而立，淡淡道：「若无几分真本事，少来我面前空费口舌。」';
+  }
+  if (npcName === '六扇门捕头') {
+    if (qp.dockCaseQuest?.stage === 'started') return '六扇门捕头压低声音道：「码头那几个人别惊动，先看他们都和谁接头。」';
+    if (state.trust >= 2) return '六扇门捕头低声道：「你若有空，替我盯一盯最近在码头晃荡的那几个人。」';
+    return '六扇门捕头目光一扫，沉声道：「城里近来不太平，若见着不对劲的人，记得来报。」';
+  }
+  return '';
 }
 
 function ensureMoneyState(player) {
@@ -1749,6 +1872,26 @@ function describeCorpse(corpse) {
   return `\n${corpse.name}，${freshness}。\n${loot.length ? `尸体上还留着: ${loot.join('、')}\n` : '尸体上已被搜刮得干干净净。\n'}`;
 }
 
+function ensureInvestigationProgress(player) {
+  player.questProgress = player.questProgress || {};
+  if (!player.questProgress.dockCaseQuest) player.questProgress.dockCaseQuest = { stage: 'idle', clues: {}, solved: false };
+  if (!player.questProgress.laobaoMessageQuest) player.questProgress.laobaoMessageQuest = { stage: 'idle', clues: {}, solved: false };
+}
+
+function updateRoomClue(player, roomName) {
+  ensureInvestigationProgress(player);
+  if (player.questProgress.dockCaseQuest.stage === 'started') {
+    if (roomName === '扬州码头') player.questProgress.dockCaseQuest.clues.dock = '你发现码头脚夫总避开一个总在黄昏出现的生面孔。';
+    if (roomName === '客栈') player.questProgress.dockCaseQuest.clues.inn = '客栈老板提过最近有阔客住店，却从不留真名。';
+    if (roomName === '扬州小巷') player.questProgress.dockCaseQuest.clues.alley = '巷口有人提到“白伞”和“夜里换手递信”。';
+  }
+  if (player.questProgress.laobaoMessageQuest.stage === 'started') {
+    if (roomName === '丽春院') player.questProgress.laobaoMessageQuest.clues.brothel = '你注意到有人递杯时总用左手，袖口还带着淡淡胭脂香。';
+    if (roomName === '扬州码头') player.questProgress.laobaoMessageQuest.clues.dock = '码头上有人嘴上说跑船，鞋底却干净得不像常年踩水的人。';
+    if (roomName === '客栈') player.questProgress.laobaoMessageQuest.clues.inn = '客栈里有人每次听到“丽春院”三个字，眼神都会微微一紧。';
+  }
+}
+
 function getBalanceSummary(player) {
   const neigongLevel = getNeigongLevel(player);
   const wugongLevel = getWugongLevel(player);
@@ -2007,11 +2150,20 @@ function tryAutoVendettaCombat(arriver) {
 }
 
 function broadcastRoomArrival(arriver, roomName) {
+  updateRoomClue(arriver, roomName);
   for (const [name, client] of Object.entries(onlinePlayers)) {
     if (name === arriver.name) continue;
     const targetPlayer = users[name];
     if (!targetPlayer || targetPlayer.room !== roomName) continue;
     client.send(`【系统】${formatArrival(arriver.name, arriver.hp, arriver.maxHp)}。\n>`);
+  }
+  const room = getRoom(roomName);
+  for (const npcName of room?.npcs || []) {
+    if (!importantNpcNames.has(npcName)) continue;
+    const line = getNpcProactiveLine(npcName, arriver);
+    if (line && onlinePlayers[arriver.name]) {
+      onlinePlayers[arriver.name].send(`【${npcName}】${line}\n>`);
+    }
   }
   tryAutoVendettaCombat(arriver);
   const followers = Object.values(players).filter(p => p.following === arriver.name && p.room !== arriver.room && !p.dead && !p.fainted);
@@ -2326,7 +2478,8 @@ wss.on('connection', (ws) => {
         门派声望: 0,
         achievements: [],
         quest: null,
-        questProgress: {}
+        questProgress: {},
+        npcRelations: {}
       };
       saveUsers();
       reloadUsersFromDb();
@@ -2362,6 +2515,12 @@ wss.on('connection', (ws) => {
           ensureMoneyState(player);
           normalizeCombatState(player);
           // 保存所有玩家数据
+          const savedNpcRelations = {};
+          for (const npcName of Object.keys(npcPlayerState)) {
+            if (npcPlayerState[npcName]?.[player.name]) {
+              savedNpcRelations[npcName] = { ...npcPlayerState[npcName][player.name] };
+            }
+          }
           Object.assign(users[player.name], {
             // 基本属性
             exp: player.exp, level: player.level, coin: player.coin,
@@ -2415,7 +2574,8 @@ wss.on('connection', (ws) => {
             信号已解码: player.信号已解码,
             faction: player.faction,
             // 扬州赌场掼蛋
-            guandan: player.guandan
+            guandan: player.guandan,
+            npcRelations: savedNpcRelations
           });
           saveUsers();
         }
@@ -2850,6 +3010,7 @@ wss.on('connection', (ws) => {
           if (npcTalkName === '黑市商人') {
             ws.send('黑市商人警惕地看了看你，低声说道："想买点什么？输入 list 黑市商人 查看货物。"\n>');
           } else {
+            noteNpcInteraction(npcTalkName, player, 'talk');
             const reply = await getNpcDialogue({
               npcName: npcTalkName,
               player,
@@ -2878,6 +3039,16 @@ wss.on('connection', (ws) => {
             break;
           }
           const askTopic = askMatch[2].trim();
+          noteNpcInteraction(askNpc, player, 'ask', { topic: askTopic });
+          ensureInvestigationProgress(player);
+          if (askNpc === '老鸨' && /消息|密信|递消息/.test(askTopic) && player.questProgress.laobaoMessageQuest?.stage === 'idle') {
+            ws.send('老鸨轻摇团扇，低声道：「你若真有心，不妨接下这桩“丽春院密信”。输入 quest accept 丽春院密信。」\n>');
+            break;
+          }
+          if (askNpc === '六扇门捕头' && /码头|可疑|案|通缉/.test(askTopic) && player.questProgress.dockCaseQuest?.stage === 'idle') {
+            ws.send('六扇门捕头看了你一眼，沉声道：「若你真想插手，就接下“码头疑案”。输入 quest accept 码头疑案。」\n>');
+            break;
+          }
           const askReply = await getNpcDialogue({
             npcName: askNpc,
             player,
@@ -3023,10 +3194,12 @@ wss.on('connection', (ws) => {
             break;
           }
           const inquireTopic = inquireMatch[2].trim();
+          noteNpcInteraction(inquireNpc, player, 'inquire', { topic: inquireTopic, sensitive: /通缉|身份|把柄|秘密|黑市|杀|案/.test(inquireTopic) });
+          ensureInvestigationProgress(player);
           const inquireReply = await getNpcDialogue({
             npcName: inquireNpc,
             player,
-            action: 'ask',
+            action: 'inquire',
             topic: inquireTopic,
             userInput: args,
           });
@@ -4032,6 +4205,74 @@ wss.on('connection', (ws) => {
         case 'quest':
         case '任务':
         case 'mission':
+          ensureInvestigationProgress(player);
+          if (args === 'accept 码头疑案') {
+            player.quest = '码头疑案';
+            player.questProgress.dockCaseQuest = { stage: 'started', clues: {}, solved: false };
+            saveProgress();
+            ws.send('【任务开始: 码头疑案】\n六扇门捕头要你暗中盯紧扬州码头、客栈、扬州小巷里的可疑动静。\n多去走动，多问多看，攒够线索后可向六扇门捕头回报。\n>');
+            break;
+          }
+          if (args === 'accept 丽春院密信') {
+            player.quest = '丽春院密信';
+            player.questProgress.laobaoMessageQuest = { stage: 'started', clues: {}, solved: false };
+            saveProgress();
+            ws.send('【任务开始: 丽春院密信】\n老鸨怀疑有人借丽春院递消息。去丽春院、扬州码头、客栈多观察，拼出真正的递信人。\n之后可向老鸨回报。\n>');
+            break;
+          }
+          if (args === 'clues' || args === '线索') {
+            const dockClues = Object.values(player.questProgress.dockCaseQuest?.clues || {});
+            const laobaoClues = Object.values(player.questProgress.laobaoMessageQuest?.clues || {});
+            let clueMsg = '【当前线索】\n';
+            clueMsg += `码头疑案: ${dockClues.length ? '\n- ' + dockClues.join('\n- ') : '暂无'}\n\n`;
+            clueMsg += `丽春院密信: ${laobaoClues.length ? '\n- ' + laobaoClues.join('\n- ') : '暂无'}\n>`;
+            ws.send(clueMsg);
+            break;
+          }
+          if (args && args.startsWith('solve 码头疑案 ')) {
+            const answer = args.substring('solve 码头疑案 '.length).trim();
+            const clues = player.questProgress.dockCaseQuest?.clues || {};
+            if (Object.keys(clues).length < 2) {
+              ws.send('你掌握的线索还不够，至少再去两个地方看看。\n>');
+              break;
+            }
+            if (answer === '情报贩子') {
+              player.questProgress.dockCaseQuest.solved = true;
+              player.questProgress.dockCaseQuest.stage = 'done';
+              player.exp += 60;
+              player.coin += 40;
+              noteNpcInteraction('六扇门捕头', player, 'gift');
+              saveProgress();
+              ws.send('【任务完成: 码头疑案】\n你将矛头指向了情报贩子。六扇门捕头没有立刻下结论，却明显高看了你一眼。\n奖励: 经验+60 铜钱+40\n今后你向六扇门捕头打听案情时，他会更认真对待。\n>');
+            } else {
+              noteNpcInteraction('六扇门捕头', player, 'inquire', { topic: '误判案情', sensitive: true });
+              saveProgress();
+              ws.send(`【判断有误】\n你将嫌疑指向【${answer}】，六扇门捕头却皱了皱眉。\n他没有当场驳你，只冷冷说了一句：“线索还没拼明白，别急着下断语。”\n>`);
+            }
+            break;
+          }
+          if (args && args.startsWith('solve 丽春院密信 ')) {
+            const answer = args.substring('solve 丽春院密信 '.length).trim();
+            const clues = player.questProgress.laobaoMessageQuest?.clues || {};
+            if (Object.keys(clues).length < 2) {
+              ws.send('你眼下还只是听风就是雨，再多找两处线索再来。\n>');
+              break;
+            }
+            if (answer === '客栈老板') {
+              player.questProgress.laobaoMessageQuest.solved = true;
+              player.questProgress.laobaoMessageQuest.stage = 'done';
+              player.exp += 50;
+              player.coin += 35;
+              noteNpcInteraction('老鸨', player, 'gift');
+              saveProgress();
+              ws.send('【任务完成: 丽春院密信】\n老鸨听完你的判断，只是意味深长地笑了笑，显然把你记在心上了。\n奖励: 经验+50 铜钱+35\n今后老鸨对你说真话的概率会更高。\n>');
+            } else {
+              noteNpcInteraction('老鸨', player, 'inquire', { topic: '误判递信人', sensitive: true });
+              saveProgress();
+              ws.send(`【判断有误】\n老鸨听你报出【${answer}】，只用手帕掩嘴笑了笑：“客官这回看错人啦，不过也不算全无眼力。”\n>`);
+            }
+            break;
+          }
           // 处理 quest accept xxx
           if (args && args.startsWith('accept ')) {
             const questName = args.substring(7);
