@@ -133,17 +133,8 @@ function restorePlayerFromStoredData(name, storedData) {
   Object.assign(p, storedData);
   if (storedData.先天) {
     p.先天 = storedData.先天;
-    p.maxHp = 100 + storedData.先天.根骨 * 10;
-    p.maxMp = 50 + storedData.先天.经脉 * 5;
-    p.外功攻击 = 10 + storedData.先天.根骨 * 2;
-    p.防御 = 5 + Math.floor(storedData.先天.根骨 / 2);
-    p.身法 = 10 + storedData.先天.悟性;
-    p.命中 = 80 + storedData.先天.悟性 * 2;
-    p.闪避 = 10 + Math.floor(storedData.先天.经脉 / 2);
-    p.暴击 = 5 + Math.floor(storedData.先天.福缘 / 2);
-    p.气血 = p.maxHp;
-    p.内力 = p.maxMp;
   }
+  normalizeCombatState(p);
   p.title = getTitle(p.exp);
   return p;
 }
@@ -775,10 +766,68 @@ const rooms = {
 };
 
 const players = {};
+const corpses = {};
+const vendettas = new Map();
 const skills = {
   '基本内功': { level: 1, exp: 0 },
   '基本拳法': { level: 1, exp: 0 },
   '基本轻功': { level: 1, exp: 0 }
+};
+
+const schoolPerformDb = {
+  '华山派': {
+    '狂风快剑': {
+      skill: '孤独九剑', minLevel: 10, minExp: 120, mpCost: 30, damageRate: 1.42, hitBonus: 14, critBonus: 8,
+      lines: ['剑光骤起，似狂风卷地', '寒芒连闪，似骤雨穿林', '人未近前，杀机已满长空']
+    },
+    '紫霞冲霄': {
+      skill: '紫霞神功', minLevel: 8, minExp: 100, mpCost: 26, damageRate: 1.34, hitBonus: 12, critBonus: 5,
+      lines: ['紫气浮空，真息鼓荡', '掌未发而气已先至', '一式推出，宛如长虹贯日']
+    }
+  },
+  '少林寺': {
+    '罗汉伏魔': {
+      skill: '罗汉拳', minLevel: 8, minExp: 90, mpCost: 24, damageRate: 1.33, hitBonus: 10, critBonus: 4,
+      lines: ['拳出如钟鸣古寺', '步进如金刚镇地', '劲力层层叠叠，直逼心脉']
+    }
+  },
+  '桃花岛': {
+    '落英缤纷': {
+      skill: '落英神掌', minLevel: 8, minExp: 80, mpCost: 24, damageRate: 1.35, hitBonus: 12, critBonus: 6,
+      lines: ['掌影飘摇，如落英满天', '虚实互生，教人难辨来路', '掌风一转，已封人周身要穴']
+    }
+  },
+  '逍遥派': {
+    '灵犀一指': {
+      skill: '灵犀指', minLevel: 10, minExp: 120, mpCost: 28, damageRate: 1.4, hitBonus: 16, critBonus: 8,
+      lines: ['两指轻拈，似慢实疾', '指风破空，直取敌手空门', '旁人未看清，胜负已分三分']
+    }
+  },
+  '万梅山庄': {
+    '天外飞仙': {
+      skill: '天外飞仙', minLevel: 12, minExp: 220, mpCost: 40, damageRate: 1.55, hitBonus: 16, critBonus: 10,
+      lines: ['一剑起处，似九天仙影垂落', '寒光照眼，天地间仿佛只余此剑', '人剑相随，刹那便是生死之分']
+    }
+  },
+  '白云城': {
+    '飞仙绝响': {
+      skill: '天外飞仙', minLevel: 12, minExp: 220, mpCost: 38, damageRate: 1.5, hitBonus: 15, critBonus: 9,
+      lines: ['白云尽散，剑意独明', '身形一纵，仿佛踏月而来', '剑势将尽未尽，却已逼人绝路']
+    }
+  }
+};
+
+const npcPerformDb = {
+  '岳不群': { school: '华山派', performs: ['紫霞冲霄'] },
+  '风清扬': { school: '华山派', performs: ['狂风快剑'] },
+  '方丈': { school: '少林寺', performs: ['罗汉伏魔'] },
+  '黄药师': { school: '桃花岛', performs: ['落英缤纷'] },
+  '陆小凤': { school: '逍遥派', performs: ['灵犀一指'] },
+  '西门吹雪': { school: '万梅山庄', performs: ['天外飞仙'] }
+};
+
+const ANSI = {
+  reset: '\u001b[0m', red: '\u001b[31m', yellow: '\u001b[33m', magenta: '\u001b[35m', cyan: '\u001b[36m'
 };
 
 const mapFull = `
@@ -929,6 +978,8 @@ function createPlayer(name) {
     hp: maxHp, maxHp: maxHp,
     mp: maxMp, maxMp: maxMp,
     exp: 0, level: 1,
+    pvpKills: 0,
+    deaths: 0,
     coin: 500,  // 铜钱
     silver: 5,
     gold: 1,
@@ -960,9 +1011,14 @@ function createPlayer(name) {
     // 声望
     门派声望: 0,
     正邪值: 0,
+    following: null,
+    vendetta: [],
+    lastAttacker: null,
     // 晕倒状态
     fainted: false,
     faintTime: 0,
+    dead: false,
+    deadTime: 0,
     // 睡觉状态
     sleeping: false,
     sleepStartTime: 0,
@@ -1544,12 +1600,427 @@ function formatArrival(name, hp, maxHp) {
   return prefix ? `${name}${prefix}走了过来` : `${name}走了过来`;
 }
 
+function getSkillLevel(player, skillName) {
+  return Number(player.skills?.[skillName]?.level || 0);
+}
+
+function getNeigongLevel(player) {
+  return Math.max(
+    getSkillLevel(player, '基本内功'),
+    getSkillLevel(player, '九阳神功'),
+    getSkillLevel(player, '九阴真经'),
+    getSkillLevel(player, '北冥神功'),
+    getSkillLevel(player, '紫霞神功'),
+    getSkillLevel(player, '易筋经')
+  );
+}
+
+function getWugongLevel(player) {
+  const offensiveLevels = Object.entries(player.skills || {})
+    .filter(([name]) => skillDb[name]?.type === '主动' || name === '基本拳法')
+    .map(([, sk]) => Number(sk.level || 0));
+  return offensiveLevels.length ? Math.max(...offensiveLevels) : 1;
+}
+
+function recalculateDerivedStats(player) {
+  const baseAttr = player.先天 || { 根骨: 5, 悟性: 5, 经脉: 5, 福缘: 5 };
+  const neigongLevel = getNeigongLevel(player);
+  const wugongLevel = getWugongLevel(player);
+  player.maxMp = 50 + baseAttr.经脉 * 5 + neigongLevel * 6;
+  player.maxHp = 100 + baseAttr.根骨 * 10 + neigongLevel * 3 + Math.floor(player.maxMp * 0.18);
+  player.外功攻击 = 10 + baseAttr.根骨 * 2 + wugongLevel * 2;
+  player.内功攻击 = Math.floor(neigongLevel * 1.2);
+  player.防御 = 5 + Math.floor(baseAttr.根骨 / 2) + Math.floor(neigongLevel / 3);
+  player.身法 = 10 + baseAttr.悟性 + Math.floor(wugongLevel / 3);
+  player.命中 = 80 + baseAttr.悟性 * 2 + Math.floor(wugongLevel * 0.8);
+  player.闪避 = 10 + Math.floor(baseAttr.经脉 / 2) + Math.floor(player.身法 / 8);
+  player.暴击 = 5 + Math.floor(baseAttr.福缘 / 2) + Math.floor(wugongLevel / 5);
+  player.hp = Math.max(0, Math.min(player.hp ?? player.maxHp, player.maxHp));
+  player.mp = Math.max(0, Math.min(player.mp ?? player.maxMp, player.maxMp));
+  player.气血 = player.hp;
+  player.内力 = player.mp;
+}
+
+function normalizeCombatState(player) {
+  player.follows = Array.isArray(player.follows) ? player.follows : [];
+  player.following = player.following || null;
+  player.vendetta = Array.isArray(player.vendetta) ? player.vendetta : [];
+  player.lastAttacker = player.lastAttacker || null;
+  player.pvpKills = Number(player.pvpKills || 0);
+  player.deaths = Number(player.deaths || 0);
+  player.dead = !!player.dead;
+  player.deadTime = Number(player.deadTime || 0);
+  recalculateDerivedStats(player);
+}
+
+function syncVendettaMap(player) {
+  vendettas.set(player.name, new Set(player.vendetta || []));
+}
+
+function addVendetta(player, targetName) {
+  if (!targetName || targetName === player.name) return false;
+  normalizeCombatState(player);
+  if (!player.vendetta.includes(targetName)) player.vendetta.push(targetName);
+  syncVendettaMap(player);
+  return true;
+}
+
+function clearVendettaBetween(nameA, nameB) {
+  for (const [selfName, targetName] of [[nameA, nameB], [nameB, nameA]]) {
+    const role = players[selfName] || users[selfName];
+    if (!role) continue;
+    role.vendetta = (role.vendetta || []).filter(v => v !== targetName);
+    vendettas.set(selfName, new Set(role.vendetta));
+  }
+}
+
+function ensureCorpseRoom(roomName) {
+  if (!corpses[roomName]) corpses[roomName] = [];
+  return corpses[roomName];
+}
+
+function createCorpse({ roomName, ownerName, sourceType = 'player', items = [], coin = 0, silver = 0, gold = 0 }) {
+  const corpse = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: `${ownerName}的尸体`, ownerName, sourceType, items: [...items], coin, silver, gold, createdAt: Date.now(), expiresAt: Date.now() + 3 * 60 * 1000
+  };
+  ensureCorpseRoom(roomName).push(corpse);
+  setTimeout(() => cleanupCorpse(roomName, corpse.id), 3 * 60 * 1000);
+  return corpse;
+}
+
+function cleanupCorpse(roomName, corpseId) {
+  const roomCorpses = ensureCorpseRoom(roomName);
+  const index = roomCorpses.findIndex(c => c.id === corpseId);
+  if (index >= 0) {
+    const [corpse] = roomCorpses.splice(index, 1);
+    for (const p of Object.values(players)) {
+      if (p.room === roomName && onlinePlayers[p.name]) {
+        onlinePlayers[p.name].send(`一阵轻烟飘过，${corpse.name}化作飞灰，消失不见了。\n>`);
+      }
+    }
+  }
+}
+
+function findCorpseInRoom(roomName, keyword) {
+  return ensureCorpseRoom(roomName).find(c => c.name === keyword || c.ownerName === keyword || c.name.includes(keyword));
+}
+
+function getCorpseSummary(roomName) {
+  const roomCorpses = ensureCorpseRoom(roomName);
+  return roomCorpses.length ? `\n地上横着: ${roomCorpses.map(c => c.name).join('、')}` : '';
+}
+
+function getPerformByName(player, input) {
+  const schoolPerforms = schoolPerformDb[player.school] || {};
+  return Object.entries(schoolPerforms).find(([name]) => name === input || name.toLowerCase() === input.toLowerCase()) || null;
+}
+
+function getNpcCombatProfile(npcName) {
+  const meta = getNpcMeta(npcName);
+  const role = meta.role || '江湖人物';
+  let tier = 1;
+  if (/掌门|方丈|宗师|楼主|城主|王|大亨|首席|长老/.test(role)) tier = 4;
+  else if (/捕头|统领|高手|镖头|岛主/.test(role)) tier = 3;
+  else if (/弟子|护卫|武僧|杀手|官兵|庄家/.test(role)) tier = 2;
+  const npcPerform = npcPerformDb[npcName];
+  return {
+    tier,
+    school: npcPerform?.school || null,
+    performs: npcPerform?.performs || [],
+    maxHp: 65 + tier * 28,
+    attack: 10 + tier * 6,
+    defense: 4 + tier * 3,
+    hit: 68 + tier * 6,
+    dodge: 8 + tier * 4,
+    exp: 12 + tier * 12,
+    coin: 6 + tier * 10
+  };
+}
+
+function describeCorpse(corpse) {
+  const loot = [];
+  if (corpse.coin) loot.push(`${corpse.coin}铜钱`);
+  if (corpse.silver) loot.push(`${corpse.silver}银`);
+  if (corpse.gold) loot.push(`${corpse.gold}金`);
+  if (corpse.items?.length) loot.push(corpse.items.join('、'));
+  const ageSec = Math.max(0, Math.floor((Date.now() - corpse.createdAt) / 1000));
+  const freshness = ageSec < 30 ? '尸身尚温' : ageSec < 90 ? '血迹未干' : ageSec < 150 ? '尸身渐冷' : '已开始腐朽';
+  return `\n${corpse.name}，${freshness}。\n${loot.length ? `尸体上还留着: ${loot.join('、')}\n` : '尸体上已被搜刮得干干净净。\n'}`;
+}
+
+function getBalanceSummary(player) {
+  const neigongLevel = getNeigongLevel(player);
+  const wugongLevel = getWugongLevel(player);
+  const performs = Object.entries(schoolPerformDb[player.school] || {});
+  let msg = `【当前平衡参数】\n`;
+  msg += `武功等级:${wugongLevel} 内功等级:${neigongLevel}\n`;
+  msg += `HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp}\n`;
+  msg += `外攻:${player.外功攻击} 内攻:${player.内功攻击} 防御:${player.防御}\n`;
+  msg += `命中:${player.命中} 闪避:${player.闪避} 暴击:${player.暴击}\n`;
+  if (performs.length) {
+    msg += `\n【绝招参数】\n`;
+    for (const [name, info] of performs) {
+      msg += `${name} | 倍率:${info.damageRate} | 耗蓝:${info.mpCost} | 命中+${info.hitBonus} | 暴击+${info.critBonus}\n`;
+    }
+  }
+  const room = getRoom(player.room);
+  const npcName = room?.npcs?.[0];
+  if (npcName) {
+    const npc = getNpcCombatProfile(npcName);
+    msg += `\n【当前房间NPC参考】${npcName}\n`;
+    msg += `tier:${npc.tier} HP:${npc.maxHp} 攻:${npc.attack} 防:${npc.defense} 命中:${npc.hit}\n`;
+  }
+  return msg;
+}
+
+function formatPerformLines(lines = []) {
+  const colors = [ANSI.red, ANSI.yellow, ANSI.magenta, ANSI.cyan];
+  return lines.map((line, index) => `${colors[index % colors.length]}※ ${line}${ANSI.reset}`).join('\n');
+}
+
+function resolveCombatTarget(player, targetName) {
+  return Object.values(players).find(p => p.name === targetName && p.room === player.room && p.name !== player.name) || null;
+}
+
+function resolveCombatSubject(player, rawTargetName) {
+  const targetName = (rawTargetName || '').trim();
+  if (!targetName) return null;
+  const playerTarget = resolveCombatTarget(player, targetName);
+  if (playerTarget) return { kind: 'player', target: playerTarget, name: playerTarget.name };
+  const room = getRoom(player.room);
+  const npcName = resolveNpcName(targetName, room);
+  if (npcName) return { kind: 'npc', target: npcName, name: npcName };
+  return null;
+}
+
+function removeNpcFromRoom(roomName, npcName) {
+  const room = getRoom(roomName);
+  if (!room) return;
+  room.npcs = (room.npcs || []).filter(name => name !== npcName);
+}
+
+function createNpcCorpse(roomName, npcName) {
+  const drop = ensureNpcDrop(roomName, npcName);
+  const profile = getNpcCombatProfile(npcName);
+  createCorpse({
+    roomName,
+    ownerName: npcName,
+    sourceType: 'npc',
+    items: [...(drop.items || [])],
+    coin: drop.money || profile.coin || 0,
+    silver: 0,
+    gold: 0
+  });
+  drop.items = [];
+  drop.money = 0;
+  drop.taken = true;
+  removeNpcFromRoom(roomName, npcName);
+}
+
+function setFaintState(player) {
+  player.fainted = true;
+  player.faintTime = Date.now();
+  player.hp = Math.max(1, Math.min(player.hp, 10));
+}
+
+function runPlayerVsPlayerCombat(attacker, defender, options = {}) {
+  normalizeCombatState(attacker);
+  normalizeCombatState(defender);
+  const performData = options.performData || null;
+  const performName = options.performName || null;
+  const attackPhrases = ['大喝一声', '身形疾进', '招式凌厉', '掌风呼呼', '剑光闪闪', '真气激荡', '功力运足', '身形晃动'];
+  const baseAttackerAtk = attacker.外功攻击 + attacker.内功攻击 + (attacker.weapon ? weapons[attacker.weapon].damage : 0);
+  const baseDefenderAtk = defender.外功攻击 + defender.内功攻击 + (defender.weapon ? weapons[defender.weapon].damage : 0);
+  const hitBonus = performData?.hitBonus || 0;
+  const critBonus = performData?.critBonus || 0;
+  const damageRate = performData?.damageRate || 1;
+  let log = `
+╔══════════════════════════════════════╗
+║         ⚔️  ${attacker.name} VS ${defender.name}  ⚔️          ║
+╚══════════════════════════════════════╝
+${performData ? `${formatPerformLines(performData.lines)}
+` : ''}【${defender.name}】HP: ${defender.hp}/${defender.maxHp} ${getHpStatus(defender.hp, defender.maxHp)}
+【${attacker.name}】HP: ${attacker.hp}/${attacker.maxHp} MP:${attacker.mp}/${attacker.maxMp} ${getHpStatus(attacker.hp, attacker.maxHp)}
+
+───────────────────────────────────────
+`;
+  let round = 1;
+  while (attacker.hp > 0 && defender.hp > 0) {
+    const hitRoll = Math.random() * 100;
+    const defenderDodge = Math.min(60, Math.max(5, defender.闪避));
+    if (hitRoll <= Math.max(35, attacker.命中 + hitBonus - defenderDodge)) {
+      let dmg = Math.max(1, Math.floor((baseAttackerAtk + Math.floor(Math.random() * 12)) * damageRate - defender.防御 / 2));
+      const crit = Math.random() * 100 < (attacker.暴击 + critBonus);
+      if (crit) dmg = Math.floor(dmg * 1.5);
+      defender.hp -= dmg;
+      defender.lastAttacker = attacker.name;
+      const phrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
+      log += `第${round}招 │ ${attacker.name}${performName ? `使出【${performName}】` : phrase}，击中${defender.name}！-${dmg}HP${crit ? '【暴击】' : ''}
+`;
+    } else {
+      log += `第${round}招 │ ${attacker.name}一招落空，被${defender.name}闪身避开。
+`;
+    }
+    if (defender.hp <= 0) break;
+    const enemyHitRoll = Math.random() * 100;
+    const attackerDodge = Math.min(60, Math.max(5, attacker.闪避));
+    if (enemyHitRoll <= Math.max(35, defender.命中 - attackerDodge)) {
+      const eDmg = Math.max(1, Math.floor(baseDefenderAtk + Math.random() * 10 - attacker.防御 / 2));
+      attacker.hp -= eDmg;
+      attacker.lastAttacker = defender.name;
+      const ePhrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
+      log += `第${round}招 │ ${defender.name}${ePhrase}，击中${attacker.name}！-${eDmg}HP
+`;
+    } else {
+      log += `第${round}招 │ ${defender.name}一招抢攻，却被${attacker.name}从容避开。
+`;
+    }
+    log += `        │ ${attacker.name} HP:${Math.max(0, attacker.hp)}/${attacker.maxHp}  ${defender.name} HP:${Math.max(0, defender.hp)}/${defender.maxHp}
+───────────────────────────────────────
+`;
+    round++;
+  }
+  let result = 'ongoing';
+  if (defender.hp <= 0) result = 'defender_dead';
+  else if (attacker.hp <= 0) result = 'attacker_dead';
+  else if (attacker.hp <= 10 || defender.hp <= 10) result = 'faint';
+  return { log, result };
+}
+
+function runPlayerVsNpcCombat(player, npcName, roomName, options = {}) {
+  normalizeCombatState(player);
+  const performData = options.performData || null;
+  const performName = options.performName || null;
+  const npcProfile = getNpcCombatProfile(npcName);
+  const npcPerformName = npcProfile.performs?.length ? npcProfile.performs[Math.floor(Math.random() * npcProfile.performs.length)] : null;
+  const npcPerformInfo = npcPerformName && npcProfile.school ? schoolPerformDb[npcProfile.school]?.[npcPerformName] : null;
+  const enemyMaxHp = npcProfile.maxHp;
+  let enemyHp = enemyMaxHp;
+  const playerAtk = player.外功攻击 + player.内功攻击 + (player.weapon ? weapons[player.weapon].damage : 0);
+  const attackPhrases = ['大喝一声', '身形疾进', '招式凌厉', '掌风呼呼', '剑光闪闪', '真气激荡', '功力运足', '身形晃动', '攻势如潮', '招式精妙'];
+  const enemyAttackPhrases = ['反手一击', '攻势凌厉', '招架不住', '掌力雄浑', '招式毒辣', '迎面攻来', '功力深厚', '变招迅速', '真气弥漫', '内力惊人'];
+  let combatLog = `
+╔══════════════════════════════════════╗
+║           ⚔️  江湖恶斗  ⚔️           ║
+╚══════════════════════════════════════╝
+${performData ? `${formatPerformLines(performData.lines)}
+` : ''}
+【${npcName}】HP: ${enemyHp}/${enemyMaxHp}
+【${player.name}】HP: ${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp}
+
+───────────────────────────────────────
+`;
+  let round = 1;
+  while (enemyHp > 0 && player.hp > 0) {
+    const dmg = Math.max(1, Math.floor((playerAtk + Math.random() * 10) * (performData?.damageRate || 1) - npcProfile.defense / 2));
+    enemyHp -= dmg;
+    combatLog += `第${round}招 │ ${player.name}${performName ? `使出【${performName}】` : attackPhrases[Math.floor(Math.random() * attackPhrases.length)]}，击中${npcName}！-${dmg}HP
+`;
+    if (enemyHp <= 0) break;
+    const eHitRoll = Math.random() * 100;
+    if (eHitRoll > Math.max(35, npcProfile.hit - player.闪避)) {
+      combatLog += `第${round}招 │ ${npcName}虚晃一招，被${player.name}闪身避过。\n`;
+      combatLog += `        │ ${player.name} HP:${Math.max(0, player.hp)}/${player.maxHp}  ${npcName} HP:${Math.max(0, enemyHp)}/${enemyMaxHp}\n───────────────────────────────────────\n`;
+      round++;
+      continue;
+    }
+    const npcDamageRate = npcPerformInfo ? Math.min(1.22, npcPerformInfo.damageRate) : 1;
+    const eDmg = Math.max(1, Math.floor((npcProfile.attack + Math.floor(Math.random() * 8)) * npcDamageRate - player.防御 / 2 - (player.armor ? armors[player.armor].defense / 2 : 0)));
+    player.hp -= eDmg;
+    combatLog += `第${round}招 │ ${npcName}${npcPerformName ? `使出【${npcPerformName}】` : ` ${enemyAttackPhrases[Math.floor(Math.random() * enemyAttackPhrases.length)]}`}，击中${player.name}！-${eDmg}HP
+`;
+    combatLog += `        │ ${player.name} HP:${Math.max(0, player.hp)}/${player.maxHp}  ${npcName} HP:${Math.max(0, enemyHp)}/${enemyMaxHp}
+───────────────────────────────────────
+`;
+    round++;
+  }
+  if (enemyHp <= 0) return { log: combatLog, result: 'npc_dead' };
+  if (player.hp <= 0) return { log: combatLog, result: 'player_dead' };
+  if (player.hp <= 10) return { log: combatLog, result: 'player_faint' };
+  return { log: combatLog, result: 'ongoing' };
+}
+
+function applyDeathPenalty(player) {
+  player.deaths = (player.deaths || 0) + 1;
+  player.exp = Math.max(0, Math.floor(player.exp * 0.9));
+  player.maxMp = Math.max(30, Math.floor(player.maxMp * 0.95));
+  player.maxHp = Math.max(60, Math.floor(player.maxHp * 0.95));
+  player.hp = Math.max(1, Math.floor(player.maxHp * 0.35));
+  player.mp = Math.floor(player.maxMp * 0.35);
+  recalculateDerivedStats(player);
+}
+
+function handlePlayerDeath(victim, killer, wsVictim) {
+  victim.dead = true;
+  victim.deadTime = Date.now();
+  victim.fainted = false;
+  victim.hp = 0;
+  createCorpse({
+    roomName: victim.room,
+    ownerName: victim.name,
+    sourceType: 'player',
+    items: [...(victim.inventory || []), ...(victim.weapon ? [victim.weapon] : []), ...(victim.armor ? [victim.armor] : [])],
+    coin: victim.coin || 0,
+    silver: victim.silver || 0,
+    gold: victim.gold || 0
+  });
+  victim.inventory = [];
+  victim.weapon = null;
+  victim.armor = null;
+  victim.coin = 0;
+  victim.silver = 0;
+  victim.gold = 0;
+  if (killer) {
+    killer.pvpKills = (killer.pvpKills || 0) + 1;
+    clearVendettaBetween(victim.name, killer.name);
+  }
+  applyDeathPenalty(victim);
+  victim.room = '客栈';
+  victim.dead = false;
+  victim.deadTime = 0;
+  if (wsVictim) {
+    wsVictim.send(`\n☠️ 你已死亡，尸体留在原地。\n你在客栈中幽幽醒转，只觉功力大损。\n【当前】HP:${victim.hp}/${victim.maxHp} MP:${victim.mp}/${victim.maxMp}\n>`);
+  }
+}
+
+function tryAutoVendettaCombat(arriver) {
+  const enemies = (arriver.vendetta || []).map(name => resolveCombatTarget(arriver, name)).filter(Boolean);
+  if (!enemies.length) return;
+  const enemy = enemies[0];
+  const result = runPlayerVsPlayerCombat(arriver, enemy, {});
+  if (onlinePlayers[arriver.name]) onlinePlayers[arriver.name].send(`仇人【${enemy.name}】现身此地，你杀机陡起，立刻出手！\n${result.log}\n>`);
+  if (onlinePlayers[enemy.name]) onlinePlayers[enemy.name].send(`【警讯】${arriver.name}与你仇怨未了，见面便痛下杀手！\n${result.log}\n>`);
+  for (const [name, client] of Object.entries(onlinePlayers)) {
+    if (name !== arriver.name && name !== enemy.name && players[name]?.room === arriver.room) {
+      client.send(`【江湖风云】${arriver.name}与${enemy.name}仇人见面，甫一照面便大打出手！\n>`);
+    }
+  }
+  if (result.result === 'defender_dead') {
+    handlePlayerDeath(enemy, arriver, onlinePlayers[enemy.name]);
+  } else if (result.result === 'attacker_dead') {
+    handlePlayerDeath(arriver, enemy, onlinePlayers[arriver.name]);
+  } else {
+    if (arriver.hp <= 10) setFaintState(arriver);
+    if (enemy.hp <= 10) setFaintState(enemy);
+  }
+}
+
 function broadcastRoomArrival(arriver, roomName) {
   for (const [name, client] of Object.entries(onlinePlayers)) {
     if (name === arriver.name) continue;
     const targetPlayer = users[name];
     if (!targetPlayer || targetPlayer.room !== roomName) continue;
     client.send(`【系统】${formatArrival(arriver.name, arriver.hp, arriver.maxHp)}。\n>`);
+  }
+  tryAutoVendettaCombat(arriver);
+  const followers = Object.values(players).filter(p => p.following === arriver.name && p.room !== arriver.room && !p.dead && !p.fainted);
+  for (const follower of followers) {
+    follower.room = arriver.room;
+    follower.hp = Math.max(1, follower.hp);
+    if (onlinePlayers[follower.name]) {
+      onlinePlayers[follower.name].send(`你一路跟随${arriver.name}，来到了${arriver.room}。\n${formatOutputBrief(follower, follower.room)}`);
+    }
   }
 }
 
@@ -1589,7 +2060,7 @@ function formatOutputBrief(player, message) {
   let output = `\n=== ${message} ===\n\n`;
   const room = getRoom(player.room);
   if (room) {
-    output += room.description + '\n';
+    output += room.description + getCorpseSummary(player.room) + '\n';
     output += `\n出口: ${Object.keys(room.exits).join('、')}\n`;
     // 显示同房间的其他玩家
     const playersInRoom = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
@@ -1612,7 +2083,7 @@ function formatOutput(player, message) {
   let output = `\n=== ${message} ===\n\n`;
   const room = getRoom(player.room);
   if (room) {
-    output += room.description + '\n';
+    output += room.description + getCorpseSummary(player.room) + '\n';
     output += `\n出口: ${Object.keys(room.exits).join('、')}\n`;
     // 显示同房间的其他玩家
     const playersInRoom = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
@@ -1745,27 +2216,8 @@ wss.on('connection', (ws) => {
 
     if (state === 'login_pwd') {
       if (users[tempName] && users[tempName].password === input) {
-        // 先创建玩家（包含随机属性）
-        player = createPlayer(tempName);
-        // 再从保存的数据中覆盖（确保先天资质等不丢失）
+        player = restorePlayerFromStoredData(tempName, users[tempName]);
         const savedData = users[tempName];
-        Object.assign(player, savedData);
-        
-        // 如果之前有保存先天资质，使用保存的（不重新随机）
-        if (savedData.先天) {
-          player.先天 = savedData.先天;
-          // 重新计算后天属性
-          player.maxHp = 100 + savedData.先天.根骨 * 10;
-          player.maxMp = 50 + savedData.先天.经脉 * 5;
-          player.外功攻击 = 10 + savedData.先天.根骨 * 2;
-          player.防御 = 5 + Math.floor(savedData.先天.根骨 / 2);
-          player.身法 = 10 + savedData.先天.悟性;
-          player.命中 = 80 + savedData.先天.悟性 * 2;
-          player.闪避 = 10 + Math.floor(savedData.先天.经脉 / 2);
-          player.暴击 = 5 + Math.floor(savedData.先天.福缘 / 2);
-          player.气血 = player.maxHp;
-          player.内力 = player.maxMp;
-        }
         
         // 检查是否晕倒状态需要恢复
         if (player.fainted && player.faintTime) {
@@ -1786,6 +2238,8 @@ wss.on('connection', (ws) => {
         }
         
         ensureMoneyState(player);
+        normalizeCombatState(player);
+        syncVendettaMap(player);
         player.title = getTitle(player.exp);
         players[tempName] = player;
         onlinePlayers[tempName] = ws;
@@ -1851,15 +2305,17 @@ wss.on('connection', (ws) => {
         name: tempName,
         password: input, exp: 0, level: 1, gold: 50,
         skills: JSON.parse(JSON.stringify(skills)),
-        hp: 100, mp: 50,
+        hp: newPlayer.hp, mp: newPlayer.mp,
         inventory: [], weapon: null, armor: null, 
-        follows: [], master: null, school: null,
+        follows: [], following: null, vendetta: [], lastAttacker: null,
+        master: null, school: null,
+        pvpKills: 0, deaths: 0,
         // 保存先天资质
         先天: newPlayer.先天,
         气血: newPlayer.气血,
         内力: newPlayer.内力,
         外功攻击: newPlayer.外功攻击,
-        内功攻击: 0,
+        内功攻击: newPlayer.内功攻击,
         防御: newPlayer.防御,
         身法: newPlayer.身法,
         命中: newPlayer.命中,
@@ -1876,6 +2332,7 @@ wss.on('connection', (ws) => {
       reloadUsersFromDb();
       player = newPlayer;
       ensureMoneyState(player);
+      normalizeCombatState(player);
       players[tempName] = player;
       onlinePlayers[tempName] = ws;
       state = 'playing';
@@ -1903,6 +2360,7 @@ wss.on('connection', (ws) => {
         if (users[player.name]) {
           markPlayerHeartbeat(player);
           ensureMoneyState(player);
+          normalizeCombatState(player);
           // 保存所有玩家数据
           Object.assign(users[player.name], {
             // 基本属性
@@ -1924,6 +2382,9 @@ wss.on('connection', (ws) => {
             armor: player.armor,
             // 社交和师门
             follows: player.follows,
+            following: player.following,
+            vendetta: player.vendetta,
+            lastAttacker: player.lastAttacker,
             master: player.master,
             school: player.school,
             // 任务系统
@@ -1943,6 +2404,10 @@ wss.on('connection', (ws) => {
             暴击: player.暴击,
             // 门派声望
             门派声望: player.门派声望,
+            pvpKills: player.pvpKills,
+            deaths: player.deaths,
+            dead: player.dead,
+            deadTime: player.deadTime,
             // 成就
             achievements: player.achievements || [],
             // 三体线
@@ -1959,15 +2424,21 @@ wss.on('connection', (ws) => {
       switch (cmd) {
         case 'look':
         case 'l':
-          // 查看其他玩家
           if (args) {
+            const corpse = findCorpseInRoom(player.room, args);
+            if (corpse) {
+              ws.send(describeCorpse(corpse) + '>');
+              break;
+            }
             const roomNow = getRoom(player.room);
             const npcName = resolveNpcName(args, roomNow);
             if (npcName) {
               const meta = getNpcMeta(npcName);
               const drop = ensureNpcDrop(player.room, npcName);
+              const npcProfile = getNpcCombatProfile(npcName);
               let npcMsg = `\n${formatNpcName(npcName)}，${meta.role}。\n`;
               npcMsg += `口头语: 「${meta.quote}」\n`;
+              npcMsg += `看起来功力约莫在 ${npcProfile.tier} 阶，气息${npcProfile.tier >= 4 ? '深不可测' : npcProfile.tier >= 3 ? '颇为沉稳' : npcProfile.tier >= 2 ? '尚算扎实' : '平平无奇'}。\n`;
               if (!drop.taken) {
                 const lootText = [];
                 if (drop.money > 0) lootText.push(`${drop.money}铜钱`);
@@ -1981,7 +2452,7 @@ wss.on('connection', (ws) => {
             if (target) {
               ws.send('\n' + getPlayerDescription(target) + '\n>');
             } else {
-              ws.send('这里没有这个玩家。\n>');
+              ws.send('这里没有这个玩家、NPC或尸体。\n>');
             }
           } else {
             ws.send(formatOutputBrief(player, player.room));
@@ -2029,6 +2500,12 @@ wss.on('connection', (ws) => {
         case '状态':
           ws.send(formatOutput(player, player.room));
           break;
+
+        case 'balance':
+        case '平衡':
+          normalizeCombatState(player);
+          ws.send(getBalanceSummary(player) + '\n>');
+          break;
         
         case 'go':
         case '走':
@@ -2058,6 +2535,7 @@ wss.on('connection', (ws) => {
         case '离城':
         case '东郊':
         case '凤栖':
+          player.following = null;
           let goArgs = args || cmd;
           // 出海指令特殊处理：只有在水边才能出海
           if (cmd === '出海') {
@@ -2118,25 +2596,29 @@ wss.on('connection', (ws) => {
         case 'n':
         case 'north':
         case '北':
+          player.following = null;
           if (movePlayer(player, '北')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向北走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('北边没有路。可用: ' + exits); } break;
         case 's':
         case 'south':
         case '南':
+          player.following = null;
           if (movePlayer(player, '南')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向南走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('南边没有路。可用: ' + exits); } break;
         case 'e':
         case 'east':
         case '东':
+          player.following = null;
           if (movePlayer(player, '东')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向东走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('东边没有路。可用: ' + exits); } break;
         case 'w':
         case 'west':
         case '西':
+          player.following = null;
           if (movePlayer(player, '西')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向西走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('西边没有路。可用: ' + exits); } break;
         case 'u':
         case 'up':
-        case '上': if (movePlayer(player, '上')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向上走去')); } else ws.send('上面没有路。'); break;
+        case '上': player.following = null; if (movePlayer(player, '上')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向上走去')); } else ws.send('上面没有路。'); break;
         case 'd':
         case 'down':
-        case '下': if (movePlayer(player, '下')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向下走去')); } else ws.send('下面没有路。'); break;
+        case '下': player.following = null; if (movePlayer(player, '下')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向下走去')); } else ws.send('下面没有路。'); break;
 
         case 'eat':
         case '使用':
@@ -2231,7 +2713,7 @@ wss.on('connection', (ws) => {
           break;
 
         case 'skills':
-          // 查看指定师父的技能
+        case 'performs':
           if (args && masters[args]) {
             const m = masters[args];
             ws.send(`【\${args}】可传授技能: ${m.skill} - ${skillDb[m.skill] ? skillDb[m.skill].desc : '绝技'}\n>`);
@@ -2240,6 +2722,16 @@ wss.on('connection', (ws) => {
           let skillMsg = '\n【技能】\n';
           for (const [name, sk] of Object.entries(player.skills)) {
             skillMsg += `${name}: ${sk.level}级 (经验: ${sk.exp})\n`;
+          }
+          const performs = Object.entries(schoolPerformDb[player.school] || {});
+          if (performs.length) {
+            skillMsg += '\n【可用绝招】\n';
+            for (const [name, info] of performs) {
+              const level = getSkillLevel(player, info.skill);
+              const unlocked = level >= info.minLevel && player.exp >= info.minExp;
+              skillMsg += `${name} | 依托:${info.skill} | 需求:${info.minLevel}级/${info.minExp}经验 | 消耗:${info.mpCost}MP | ${unlocked ? '可施展' : '未解锁'}\n`;
+            }
+            skillMsg += '\n输入 perform 绝招名 目标名 施展绝招\n';
           }
           skillMsg += '\n输入 learn [技能名] 学习新技能\n';
           ws.send(skillMsg + '\n>');
@@ -2285,13 +2777,30 @@ wss.on('connection', (ws) => {
             player.hp = Math.min(player.maxHp, player.hp + hpGain);
             player.mp = Math.min(player.maxMp, player.mp + mpGain);
             player.exp += expGain;
+            const neigongSkill = ['基本内功', '紫霞神功', '易筋经', '北冥神功', '九阳神功', '九阴真经'].find(name => player.skills[name]);
+            const wugongSkill = Object.keys(player.skills).find(name => skillDb[name]?.type === '主动') || '基本拳法';
+            if (neigongSkill) {
+              player.skills[neigongSkill].exp = (player.skills[neigongSkill].exp || 0) + 10;
+              if (player.skills[neigongSkill].exp >= player.skills[neigongSkill].level * 28) {
+                player.skills[neigongSkill].exp = 0;
+                player.skills[neigongSkill].level += 1;
+              }
+            }
+            if (wugongSkill && player.skills[wugongSkill]) {
+              player.skills[wugongSkill].exp = (player.skills[wugongSkill].exp || 0) + 7;
+              if (player.skills[wugongSkill].exp >= player.skills[wugongSkill].level * 26) {
+                player.skills[wugongSkill].exp = 0;
+                player.skills[wugongSkill].level += 1;
+              }
+            }
+            recalculateDerivedStats(player);
             const oldTitle = player.title;
             player.title = getTitle(player.exp);
             const actualHpGain = player.hp - oldHp;
             const actualMpGain = player.mp - oldMp;
             let titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
             saveProgress();
-            ws.send(`你在练功房打坐片刻，感觉内力有所增长！\nHP+${actualHpGain}, MP+${actualMpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 经验:${player.exp}${titleMsg}\n>`);
+            ws.send(`你在练功房打坐片刻，感觉内力与武学都更进了一层！\nHP+${actualHpGain}, MP+${actualMpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 武功:${getWugongLevel(player)} 内功:${getNeigongLevel(player)}\n【平衡参考】外攻:${player.外功攻击} 内攻:${player.内功攻击} 防御:${player.防御}${titleMsg}\n>`);
           } else {
             let goMsg = '这里不是练功房，无法修炼。\n';
             if (player.room === '客栈') goMsg += '提示: 客栈北边有练功房 (north)\n';
@@ -2382,7 +2891,46 @@ wss.on('connection', (ws) => {
         case 'get':
         case '拾取':
           if (!args) {
-            ws.send('用法: get NPC\n>');
+            ws.send('用法: get NPC 或 get all from 尸体\n>');
+            break;
+          }
+          const corpseMatch = args.match(/^all\s+from\s+(.+)$/i);
+          if (corpseMatch) {
+            const corpse = findCorpseInRoom(player.room, corpseMatch[1].trim());
+            if (!corpse) {
+              ws.send('这里没有这具尸体。\n>');
+              break;
+            }
+            let lootMsg = `你俯身搜了搜${corpse.name}。\n`;
+            if (corpse.coin) {
+              player.coin += corpse.coin;
+              lootMsg += `获得铜钱 ${corpse.coin}。\n`;
+            }
+            if (corpse.silver) {
+              player.silver += corpse.silver;
+              lootMsg += `获得白银 ${corpse.silver}。\n`;
+            }
+            if (corpse.gold) {
+              player.gold += corpse.gold;
+              lootMsg += `获得黄金 ${corpse.gold}。\n`;
+            }
+            if (corpse.items.length) {
+              player.inventory.push(...corpse.items);
+              lootMsg += `获得物品: ${corpse.items.join('、')}\n`;
+            }
+            if (!corpse.coin && !corpse.silver && !corpse.gold && !corpse.items.length) {
+              lootMsg += '可惜这具尸体已经被搜空了。\n';
+            }
+            corpse.coin = 0;
+            corpse.silver = 0;
+            corpse.gold = 0;
+            corpse.items = [];
+            if (corpse.expiresAt - Date.now() > 15000) {
+              corpse.expiresAt = Date.now() + 15000;
+              setTimeout(() => cleanupCorpse(player.room, corpse.id), 15000);
+            }
+            saveProgress();
+            ws.send(lootMsg + '>');
             break;
           }
           const getNpc = resolveNpcName(args, getRoom(player.room));
@@ -2838,273 +3386,157 @@ wss.on('connection', (ws) => {
           break;
 
         case 'fight':
-          // 检查是否有指定对手
-          if (args) {
-            // 先检查是否是同房间的玩家
-            const target = Object.values(players).find(p => p.name === args && p.room === player.room && p.name !== player.name);
-            if (target) {
-              // 玩家之间的战斗
-              const playerAtk = 10 + (player.weapon ? weapons[player.weapon].damage : 0);
-              const targetAtk = 10 + (target.weapon ? weapons[target.weapon].damage : 0);
-              
-              const attackPhrases = [
-                '大喝一声', '身形疾进', '招式凌厉', '掌风呼呼', '剑光闪闪',
-                '真气激荡', '功力运足', '身形晃动', '攻势如潮', '招式精妙'
-              ];
-              
-              // 战斗开始时立即通知双方
-              const startCombatLog = `
-╔══════════════════════════════════════╗
-║         ⚔️  ${player.name} VS ${target.name}  ⚔️          ║
-╚══════════════════════════════════════╝
-
-【${target.name}】HP: ${target.hp}/${target.maxHp} ${getHpStatus(target.hp, target.maxHp)}
-【${player.name}】HP: ${player.hp}/${player.maxHp} ${getHpStatus(player.hp, player.maxHp)}
-
-───────────────────────────────────────
-`;
-              ws.send(startCombatLog);
-              if (onlinePlayers[target.name]) {
-                onlinePlayers[target.name].send(startCombatLog);
+        case 'kill':
+        case 'perform':
+          if ((cmd === 'fight' || cmd === 'kill' || cmd === 'perform') && args) {
+            const performMatch = cmd === 'perform' ? args.match(/^(.+?)\s+(?:to\s+)?(.+)$/i) : null;
+            const targetName = cmd === 'perform' ? (performMatch ? performMatch[2].trim() : '') : args;
+            const subject = resolveCombatSubject(player, targetName);
+            if (subject?.kind === 'player') {
+              const target = subject.target;
+              normalizeCombatState(player);
+              normalizeCombatState(target);
+              let performData = null;
+              let performName = null;
+              if (cmd === 'perform') {
+                if (!performMatch) {
+                  ws.send('用法: perform 绝招名 目标名\n>');
+                  break;
+                }
+                const found = getPerformByName(player, performMatch[1].trim());
+                if (!found) {
+                  ws.send('你不会这门绝招，或尚未拜入对应门派。\n>');
+                  break;
+                }
+                [performName, performData] = found;
+                const level = getSkillLevel(player, performData.skill);
+                if (level < performData.minLevel || player.exp < performData.minExp) {
+                  ws.send(`你的${performData.skill}火候未到，还使不出【${performName}】。\n>`);
+                  break;
+                }
+                if (player.mp < performData.mpCost) {
+                  ws.send('你的内力不足，强行运招只会伤及自身。\n>');
+                  break;
+                }
+                player.mp -= performData.mpCost;
               }
-              
-              let tHp = target.hp;
-              let round = 1;
-              
-              while (tHp > 0 && player.hp > 0) {
-                const dmg = Math.max(1, playerAtk + Math.floor(Math.random() * 10) - 5);
-                tHp -= dmg;
-                const phrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
-                const roundLog1 = `第${round}招 │ ${player.name} ${phrase}，击中${target.name}！-${dmg}HP\n`;
-                ws.send(roundLog1);
-                if (onlinePlayers[target.name]) {
-                  onlinePlayers[target.name].send(roundLog1);
-                }
-                
-                if (tHp <= 0) break;
-                
-                const eDmg = Math.max(1, targetAtk + Math.floor(Math.random() * 10) - 5);
-                player.hp -= eDmg;
-                // 检查是否晕倒
-                if (player.hp < 5) {
-                  player.fainted = true;
-                  player.faintTime = Date.now();
-                  player.hp = 1;
-                  ws.send('═══════════════════════════════════════\n       你眼前一黑，没有了任何知觉......\n═══════════════════════════════════════\n');
-                  if (onlinePlayers[target.name]) {
-                    onlinePlayers[target.name].send(`【${player.name}】倒在地上，晕了过去。\n`);
-                  }
-                  saveProgress();
-                  return;
-                }
-                const ePhrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
-                const roundLog2 = `第${round}招 │ ${target.name} ${ePhrase}，击中${player.name}！-${eDmg}HP\n`;
-                ws.send(roundLog2);
-                if (onlinePlayers[target.name]) {
-                  onlinePlayers[target.name].send(roundLog2);
-                }
-                
-                const statusLog = `        │ ${player.name} HP:${Math.max(0, player.hp)}/${player.maxHp}  ${target.name} HP:${Math.max(0, tHp)}/${target.maxHp}\n───────────────────────────────────────\n`;
-                ws.send(statusLog);
-                if (onlinePlayers[target.name]) {
-                  onlinePlayers[target.name].send(statusLog);
-                }
-                round++;
+              if (cmd === 'kill') {
+                addVendetta(player, target.name);
+                addVendetta(target, player.name);
               }
-              
-              // 更新目标玩家属性
-              target.hp = Math.max(1, tHp);
-              
-              // 检查目标是否晕倒
-              if (target.hp < 5) {
-                target.fainted = true;
-                target.faintTime = Date.now();
-                target.hp = 1;
-                if (onlinePlayers[target.name]) {
-                  onlinePlayers[target.name].send('═══════════════════════════════════════\n       你眼前一黑，没有了任何知觉......\n═══════════════════════════════════════\n');
-                }
-              }
-              
-              if (player.hp > 0) {
-                const goldGain = 20 + Math.floor(Math.random() * 30);
-                const expGain = 30 + Math.floor(Math.random() * 20);
-                player.coin += goldGain;
-                player.exp += expGain;
-                const oldTitle = player.title;
+              const result = runPlayerVsPlayerCombat(player, target, { performData, performName });
+              ws.send(result.log);
+              if (onlinePlayers[target.name]) onlinePlayers[target.name].send(result.log);
+              if (result.result === 'defender_dead') {
+                handlePlayerDeath(target, player, onlinePlayers[target.name]);
+                player.exp += 40;
+                player.coin += 30;
                 player.title = getTitle(player.exp);
-                let titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
-                const winLog = `
-╔══════════════════════════════════════╗
-║           🏆 战斗胜利  🏆              ║
-╠══════════════════════════════════════╣
-║  击败了 ${target.name}                    ║
-║  获得铜钱: ${goldGain}                        ║
-║  获得经验: ${expGain}                        ║
-║  当前经验: ${player.exp}                     ║
-╚══════════════════════════════════════╝${titleMsg}
-`;
-                ws.send(winLog + '\n>');
-                if (onlinePlayers[target.name]) {
-                  const loseLog = `
-╔══════════════════════════════════════╗
-║           💀 战斗落败  💀              ║
-╠══════════════════════════════════════╣
-║  你被 ${player.name} 击败了...            ║
-║  损失铜钱: 10                       ║
-╚══════════════════════════════════════╝
-`;
-                  onlinePlayers[target.name].send(loseLog + '\n>');
-                }
                 saveProgress();
+                ws.send(`\n🏆 你击杀了${target.name}，夺得30铜钱，经验+40。\n>`);
+              } else if (result.result === 'attacker_dead') {
+                handlePlayerDeath(player, target, ws);
+                saveProgress();
+                if (onlinePlayers[target.name]) onlinePlayers[target.name].send(`\n🏆 ${target.name}击杀了你。\n>`);
               } else {
-                const loseLog = `
-╔══════════════════════════════════════╗
-║           💀 战斗落败  💀              ║
-╠══════════════════════════════════════╣
-║  你被 ${target.name} 击败了...            ║
-║  损失铜钱: 10                       ║
-╚══════════════════════════════════════╝
-`;
-                ws.send(loseLog + '\n>');
-                if (onlinePlayers[target.name]) {
-                  const winLog = `
-╔══════════════════════════════════════╗
-║           🏆 战斗胜利  🏆              ║
-╠══════════════════════════════════════╣
-║  击败了 ${player.name}                    ║
-╚══════════════════════════════════════╝
-`;
-                  onlinePlayers[target.name].send(winLog + '\n>');
-                }
-                player.coin = Math.max(0, player.coin - 10);
-                player.fainted = true;
-                player.faintTime = Date.now();
-                player.hp = 1;
-                ws.send('你眼前一黑，没有了任何知觉......\n>');
-                // 通知同房间其他玩家
-                Object.values(onlinePlayers).forEach(client => {
-                  if (client !== ws && client !== onlinePlayers[target.name]) {
-                    const roomPlayers = Object.values(players).filter(p => p.room === player.room);
-                    if (roomPlayers.find(p => p.name === player.name)) {
-                      client.send(`【${player.name}】倒在地上，晕了过去。\n`);
-                    }
-                  }
-                });
+                if (player.hp <= 10) setFaintState(player);
+                if (target.hp <= 10) setFaintState(target);
                 saveProgress();
               }
               break;
             }
-            // 如果指定了对手但不是在线玩家，继续执行NPC战斗
+            if (subject?.kind === 'npc') {
+              let performData = null;
+              let performName = null;
+              if (cmd === 'perform') {
+                if (!performMatch) {
+                  ws.send('用法: perform 绝招名 目标名\n>');
+                  break;
+                }
+                const found = getPerformByName(player, performMatch[1].trim());
+                if (!found) {
+                  ws.send('你不会这门绝招，或尚未拜入对应门派。\n>');
+                  break;
+                }
+                [performName, performData] = found;
+                const level = getSkillLevel(player, performData.skill);
+                if (level < performData.minLevel || player.exp < performData.minExp) {
+                  ws.send(`你的${performData.skill}火候未到，还使不出【${performName}】。\n>`);
+                  break;
+                }
+                if (player.mp < performData.mpCost) {
+                  ws.send('你的内力不足，强行运招只会伤及自身。\n>');
+                  break;
+                }
+                player.mp -= performData.mpCost;
+              }
+              const result = runPlayerVsNpcCombat(player, subject.target, player.room, { performData, performName });
+              if (result.result === 'npc_dead') {
+                const npcProfile = getNpcCombatProfile(subject.target);
+                createNpcCorpse(player.room, subject.target);
+                const goldGain = npcProfile.coin;
+                const expGain = npcProfile.exp;
+                player.coin += goldGain;
+                player.exp += expGain;
+                const oldTitle = player.title;
+                player.title = getTitle(player.exp);
+                const titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
+                saveProgress();
+                ws.send(result.log + `
+╔══════════════════════════════════════╗
+║           🏆 战斗胜利  🏆              ║
+╠══════════════════════════════════════╣
+║  ${subject.target}横尸当场，尸体留在原地        ║
+║  获得铜钱: ${goldGain}                        ║
+║  获得经验: ${expGain}                        ║
+╚══════════════════════════════════════╝${titleMsg}
+>`);
+              } else if (result.result === 'player_dead') {
+                handlePlayerDeath(player, null, ws);
+                saveProgress();
+                ws.send(result.log + '\n>');
+              } else {
+                if (result.result === 'player_faint') setFaintState(player);
+                saveProgress();
+                ws.send(result.log + '\n>');
+              }
+              break;
+            }
           }
           
-          // 原有的NPC战斗
           const room3 = getRoom(player.room);
           if (room3 && room3.npcs.length > 0) {
             const enemy = room3.npcs[Math.floor(Math.random() * room3.npcs.length)];
-            const enemyHp = 50 + Math.floor(Math.random() * 30);
-            const enemyMaxHp = enemyHp;
-            const playerAtk = 10 + (player.weapon ? weapons[player.weapon].damage : 0);
-            
-            // 金庸风格战斗描述
-            const attackPhrases = [
-              '大喝一声', '身形疾进', '招式凌厉', '掌风呼呼', '剑光闪闪',
-              '真气激荡', '功力运足', '身形晃动', '攻势如潮', '招式精妙'
-            ];
-            const enemyAttackPhrases = [
-              '反手一击', '攻势凌厉', '招架不住', '掌力雄浑', '招式毒辣',
-              '迎面攻来', '功力深厚', '变招迅速', '真气弥漫', '内力惊人'
-            ];
-            
-            let combatLog = `
-╔══════════════════════════════════════╗
-║           ⚔️  江湖恶斗  ⚔️           ║
-╚══════════════════════════════════════╝
-
-【${enemy}】HP: ${enemyHp}/${enemyMaxHp}
-【${player.name}】HP: ${player.hp}/${player.maxHp} MP: ${player.mp}/${player.maxMp}
-
-───────────────────────────────────────
-`;
-            let eHp = enemyHp;
-            let round = 1;
-            let battleWinner = null;
-            
-            while (eHp > 0 && player.hp > 0) {
-              const dmg = Math.max(1, playerAtk + Math.floor(Math.random() * 10) - 5);
-              eHp -= dmg;
-              const phrase = attackPhrases[Math.floor(Math.random() * attackPhrases.length)];
-              combatLog += `第${round}招 │ ${player.name} ${phrase}，击中${enemy}！-${dmg}HP\n`;
-              
-              if (eHp <= 0) {
-                battleWinner = 'player';
-                break;
-              }
-              
-              const eDmg = Math.max(1, 15 - (player.armor ? armors[player.armor].defense / 2 : 0));
-              player.hp -= eDmg;
-              // 检查是否晕倒
-              if (player.hp < 5) {
-                player.fainted = true;
-                player.faintTime = Date.now();
-                player.hp = 1;
-                combatLog += `\n═══════════════════════════════════════\n       你眼前一黑，没有了任何知觉......\n═══════════════════════════════════════\n`;
-                ws.send(combatLog + '\n>');
-                // 通知同房间其他玩家
-                Object.values(onlinePlayers).forEach(client => {
-                  if (client !== ws) {
-                    const roomPlayers = Object.values(players).filter(p => p.room === player.room);
-                    if (roomPlayers.find(p => p.name === player.name)) {
-                      client.send(`【${player.name}】倒在地上，晕了过去。\n`);
-                    }
-                  }
-                });
-                saveProgress();
-                return;
-              }
-              const ePhrase = enemyAttackPhrases[Math.floor(Math.random() * enemyAttackPhrases.length)];
-              combatLog += `第${round}招 │ ${enemy} ${ePhrase}，击中${player.name}！-${eDmg}HP\n`;
-              
-              // 显示双方实时状态
-              combatLog += `        │ ${player.name} HP:${Math.max(0, player.hp)}/${player.maxHp}  ${enemy} HP:${Math.max(0, eHp)}/${enemyMaxHp}\n`;
-              combatLog += `───────────────────────────────────────\n`;
-              round++;
-            }
-            
-            if (player.hp > 0) {
-              const goldGain = 10 + Math.floor(Math.random() * 20);
-              const expGain = 20 + Math.floor(Math.random() * 15);
+            const result = runPlayerVsNpcCombat(player, enemy, player.room, {});
+            if (result.result === 'npc_dead') {
+              const npcProfile = getNpcCombatProfile(enemy);
+              createNpcCorpse(player.room, enemy);
+              const goldGain = npcProfile.coin;
+              const expGain = npcProfile.exp;
               player.coin += goldGain;
               player.exp += expGain;
               const oldTitle = player.title;
               player.title = getTitle(player.exp);
-              let titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
-              combatLog += `
+              const titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
+              saveProgress();
+              ws.send(result.log + `
 ╔══════════════════════════════════════╗
 ║           🏆 战斗胜利  🏆              ║
 ╠══════════════════════════════════════╣
+║  ${enemy}横尸当场，尸体留在原地        ║
 ║  获得铜钱: ${goldGain}                        ║
 ║  获得经验: ${expGain}                        ║
-║  当前经验: ${player.exp}                     ║
 ╚══════════════════════════════════════╝${titleMsg}
-`;
+>`);
+            } else if (result.result === 'player_dead') {
+              handlePlayerDeath(player, null, ws);
               saveProgress();
+              ws.send(result.log + '\n>');
             } else {
-              combatLog += `
-╔══════════════════════════════════════╗
-║           💀 战斗落败  💀              ║
-╠══════════════════════════════════════╣
-║  你身负重伤，仓皇离去...            ║
-║  损失铜钱: 10                       ║
-╚══════════════════════════════════════╝
-`;
-              player.coin = Math.max(0, player.coin - 10);
-              player.fainted = true;
-              player.faintTime = Date.now();
-              player.hp = 1;
-              ws.send('你眼前一黑，没有了任何知觉......\n>');
+              if (result.result === 'player_faint') setFaintState(player);
               saveProgress();
+              ws.send(result.log + '\n>');
             }
-            ws.send(combatLog + '\n>');
           } else {
             let fightHint = '这里没有敌人可以战斗。\n';
             if (player.room === '练功房' || player.room === '客栈') {
@@ -3405,6 +3837,7 @@ wss.on('connection', (ws) => {
 
         case 'status':
         case '状态':
+          normalizeCombatState(player);
           let statusMsg = `
 ╔══════════════════════════════════════╗
 ║     【${player.name}】${player.title}              ║
@@ -3420,12 +3853,13 @@ wss.on('connection', (ws) => {
 ║ 【后天属性】(战斗属性)                     ║
 ║ 气血: ${player.hp}/${player.maxHp}                          ║
 ║ 内力: ${player.mp}/${player.maxMp}                          ║
-║ 外功攻击: ${player.外功攻击}                            ║
-║ 防御: ${player.防御}                                ║
-║ 身法: ${player.身法}                                ║
+║ 武功等级: ${getWugongLevel(player)}  内功等级: ${getNeigongLevel(player)}           ║
+║ 外功攻击: ${player.外功攻击}  内功攻击: ${player.内功攻击}          ║
+║ 防御: ${player.防御}  身法: ${player.身法}                    ║
 ╠══════════════════════════════════════╣
 ║ 【战斗衍生】                                ║
 ║ 命中: ${player.命中}%  闪避: ${player.闪避}%  暴击: ${player.暴击}%     ║
+║ 击杀: ${player.pvpKills || 0}  死亡: ${player.deaths || 0}                ║
 ╠══════════════════════════════════════╣
 ║ 经验: ${player.exp}                                  ║
 ╚══════════════════════════════════════╝
@@ -3436,6 +3870,31 @@ wss.on('connection', (ws) => {
           let skillList = Object.keys(player.skills).join(', ');
           statusMsg += `技能: ${skillList || '无'}\n`;
           ws.send(statusMsg + '\n>');
+          break;
+
+        case 'follow':
+          if (!args) {
+            ws.send('用法: follow 玩家名\n>');
+            break;
+          }
+          if (args === player.name) {
+            ws.send('你总不能跟着自己跑。\n>');
+            break;
+          }
+          const followTarget = players[args];
+          if (!followTarget || followTarget.room !== player.room) {
+            ws.send('对方不在这里，无法跟随。\n>');
+            break;
+          }
+          player.following = followTarget.name;
+          saveProgress();
+          ws.send(`你决定紧跟${followTarget.name}，除非自行移动，否则会一直跟着他。\n>`);
+          break;
+
+        case 'unfollow':
+          player.following = null;
+          saveProgress();
+          ws.send('你停下脚步，不再跟随任何人。\n>');
           break;
 
         case 'follows':
@@ -3450,6 +3909,7 @@ wss.on('connection', (ws) => {
               followMsg += `【${fname}】${isOnline}\n`;
             }
           }
+          if (player.following) followMsg += `\n当前跟随: ${player.following}\n`;
           ws.send(followMsg + '\n>');
           break;
 
@@ -3875,6 +4335,8 @@ ETO组织正在为"他们"的到来做准备...
               db.touchSession(reconnectToken, ws.clientVersion || null);
               // 恢复会话
               player = restorePlayerFromStoredData(reconnectName, storedUser);
+              normalizeCombatState(player);
+              syncVendettaMap(player);
               players[reconnectName] = player;
               onlinePlayers[reconnectName] = ws;
               state = 'playing';
