@@ -1040,6 +1040,7 @@ const npcDrops = {};
 const importantNpcNames = new Set(['老鸨', '情报贩子', '黄药师', '六扇门捕头']);
 const npcPlayerState = {};
 const npcMoodState = {};
+const npcGreetingCooldown = {};
 
 function getNpcMeta(name) {
   return npcCatalog[name] || { alias: name.toLowerCase().replace(/\s+/g, '_'), quote: '……', money: 0, loot: [], role: '江湖人物' };
@@ -1052,14 +1053,49 @@ function getRoomByNpcName(npcName) {
   return null;
 }
 
+function getNpcEntranceStyle(npcName, mode = 'arrival') {
+  const meta = getNpcMeta(npcName);
+  const role = meta.role || '江湖人物';
+  if (npcName === '老鸨') return mode === 'arrival' ? '摇着手帕，笑吟吟地走了过来。' : '扭着腰肢，行色匆匆地离开了。';
+  if (npcName === '情报贩子') return mode === 'arrival' ? '左右看了看，悄没声地凑了过来。' : '压低斗笠，快步离开了。';
+  if (npcName === '黄药师') return mode === 'arrival' ? '拂袖而来，神情冷淡。' : '衣袖一振，飘然离去了。';
+  if (npcName === '六扇门捕头') return mode === 'arrival' ? '步伐沉稳地走了过来。' : '神色肃然，快步离开了。';
+  if (/掌柜|老板/.test(role)) return mode === 'arrival' ? '掸了掸衣袖，慢慢走了过来。' : '拨了拨算盘，转身离开了。';
+  if (/老鸨|红倌/.test(role)) return mode === 'arrival' ? '带着脂粉香气走了过来。' : '裙裾轻摆，转身离开了。';
+  if (/捕头|官兵|守卫|士兵/.test(role)) return mode === 'arrival' ? '脚步整齐地走了过来。' : '神色警惕地离开了。';
+  if (/高手|掌门|宗师|岛主/.test(role)) return mode === 'arrival' ? '气定神闲地走了过来。' : '衣袂一闪，转眼便离开了。';
+  if (/小贩|商贩|商人/.test(role)) return mode === 'arrival' ? '挑着担子走了过来。' : '收拢摊子，匆匆离开了。';
+  return mode === 'arrival' ? '走了过来。' : '行色匆匆地离开了。';
+}
+
+function broadcastRoomDeparture(leaverName, roomName, type = 'player') {
+  const leaveText = type === 'npc' ? `${leaverName}${getNpcEntranceStyle(leaverName, 'departure')}` : `${leaverName}行色匆匆地离开了。`;
+  for (const [name, client] of Object.entries(onlinePlayers)) {
+    if (players[name]?.room === roomName) {
+      client.send(`【系统】${leaveText}\n>`);
+    }
+  }
+}
+
+function broadcastRoomArrivalNotice(arriverName, roomName, type = 'player') {
+  const arriveText = type === 'npc' ? `${arriverName}${getNpcEntranceStyle(arriverName, 'arrival')}` : `${arriverName}走了过来。`;
+  for (const [name, client] of Object.entries(onlinePlayers)) {
+    if (players[name]?.room === roomName) {
+      client.send(`【系统】${arriveText}\n>`);
+    }
+  }
+}
+
 function moveNpcToRoom(npcName, targetRoomName) {
   const currentRoomName = getRoomByNpcName(npcName);
   if (currentRoomName) {
+    broadcastRoomDeparture(npcName, currentRoomName, 'npc');
     rooms[currentRoomName].npcs = (rooms[currentRoomName].npcs || []).filter(name => name !== npcName);
   }
   if (rooms[targetRoomName]) {
     if (!rooms[targetRoomName].npcs.includes(npcName)) {
       rooms[targetRoomName].npcs.push(npcName);
+      broadcastRoomArrivalNotice(npcName, targetRoomName, 'npc');
     }
     return true;
   }
@@ -1324,6 +1360,28 @@ function getNpcAttitudeLine(npcName, player) {
   if (mood === '试探') return `${npcName}像是在掂量你的来路，话里总留着半截。`;
   if (mood === '有求于人') return `${npcName}似乎正有事压在心里，眼神时不时落在你身上。`;
   return '';
+}
+
+function shouldTriggerNpcGreeting(npcName, player) {
+  const now = Date.now();
+  if (!npcGreetingCooldown[player.name]) npcGreetingCooldown[player.name] = {};
+  const last = npcGreetingCooldown[player.name][npcName] || 0;
+  if (now - last < 45 * 1000) return false;
+  npcGreetingCooldown[player.name][npcName] = now;
+  return true;
+}
+
+function collectNpcGreetingLines(player, roomName) {
+  const room = getRoom(roomName || player.room);
+  if (!room) return [];
+  const lines = [];
+  for (const npcName of room.npcs || []) {
+    if (!importantNpcNames.has(npcName)) continue;
+    if (!shouldTriggerNpcGreeting(npcName, player)) continue;
+    const line = getNpcProactiveLine(npcName, player);
+    if (line) lines.push(`【${npcName}】${line}`);
+  }
+  return lines;
 }
 
 function getNpcProactiveLine(npcName, player) {
@@ -2157,19 +2215,13 @@ function broadcastRoomArrival(arriver, roomName) {
     if (!targetPlayer || targetPlayer.room !== roomName) continue;
     client.send(`【系统】${formatArrival(arriver.name, arriver.hp, arriver.maxHp)}。\n>`);
   }
-  const room = getRoom(roomName);
-  for (const npcName of room?.npcs || []) {
-    if (!importantNpcNames.has(npcName)) continue;
-    const line = getNpcProactiveLine(npcName, arriver);
-    if (line && onlinePlayers[arriver.name]) {
-      onlinePlayers[arriver.name].send(`【${npcName}】${line}\n>`);
-    }
-  }
   tryAutoVendettaCombat(arriver);
   const followers = Object.values(players).filter(p => p.following === arriver.name && p.room !== arriver.room && !p.dead && !p.fainted);
   for (const follower of followers) {
+    broadcastRoomDeparture(follower.name, follower.room, 'player');
     follower.room = arriver.room;
     follower.hp = Math.max(1, follower.hp);
+    broadcastRoomArrivalNotice(follower.name, follower.room, 'player');
     if (onlinePlayers[follower.name]) {
       onlinePlayers[follower.name].send(`你一路跟随${arriver.name}，来到了${arriver.room}。\n${formatOutputBrief(follower, follower.room)}`);
     }
@@ -2214,7 +2266,6 @@ function formatOutputBrief(player, message) {
   if (room) {
     output += room.description + getCorpseSummary(player.room) + '\n';
     output += `\n出口: ${Object.keys(room.exits).join('、')}\n`;
-    // 显示同房间的其他玩家
     const playersInRoom = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
     if (playersInRoom.length > 0) {
       output += `你看到: ${playersInRoom.map(p => formatArrival(p.name, p.hp, p.maxHp)).join('、')}\n`;
@@ -2226,6 +2277,8 @@ function formatOutputBrief(player, message) {
       output += `\n【店铺】输入 shop 查看商品\n`;
     }
   }
+  const greetingLines = collectNpcGreetingLines(player, player.room);
+  if (greetingLines.length) output += `\n${greetingLines.join('\n')}\n`;
   output += `\n> `;
   return output;
 }
@@ -2237,7 +2290,6 @@ function formatOutput(player, message) {
   if (room) {
     output += room.description + getCorpseSummary(player.room) + '\n';
     output += `\n出口: ${Object.keys(room.exits).join('、')}\n`;
-    // 显示同房间的其他玩家
     const playersInRoom = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
     if (playersInRoom.length > 0) {
       output += `你看到: ${playersInRoom.map(p => formatArrival(p.name, p.hp, p.maxHp)).join('、')}\n`;
@@ -2259,6 +2311,8 @@ function formatOutput(player, message) {
   if (player.weapon || player.armor) {
     output += `装备: ${player.weapon || '无'}(攻+${weaponDmg}) ${player.armor || '无'}(防+${armorDef})\n`;
   }
+  const greetingLines = collectNpcGreetingLines(player, player.room);
+  if (greetingLines.length) output += `\n${greetingLines.join('\n')}\n`;
   output += '\n>';
   return output;
 }
@@ -2721,6 +2775,7 @@ wss.on('connection', (ws) => {
             }
           }
           if (r && r.exits[goArgs]) {
+            broadcastRoomDeparture(player.name, player.room, 'player');
             player.room = r.exits[goArgs];
             saveProgress();
             broadcastRoomArrival(player, player.room);
@@ -2734,16 +2789,19 @@ wss.on('connection', (ws) => {
         case 'board':
         case '登船':
           if (player.room === '扬州码头') {
+            broadcastRoomDeparture(player.name, player.room, 'player');
             player.room = '远洋客轮甲板';
             saveProgress();
             broadcastRoomArrival(player, player.room);
             ws.send('你登上了远洋客轮...\n\n' + formatOutputBrief(player, player.room));
           } else if (player.room === '枫林渡口') {
+            broadcastRoomDeparture(player.name, player.room, 'player');
             player.room = '凤栖城码头';
             saveProgress();
             broadcastRoomArrival(player, player.room);
             ws.send('你登上渡船，前往凤栖城...\n\n' + formatOutputBrief(player, player.room));
           } else if (args === 'ship' && player.room === '扬州码头') {
+            broadcastRoomDeparture(player.name, player.room, 'player');
             player.room = '远洋客轮甲板';
             saveProgress();
             broadcastRoomArrival(player, player.room);
@@ -4784,6 +4842,8 @@ help - 帮助
 function movePlayer(player, direction) {
   const room = getRoom(player.room);
   if (room && room.exits[direction]) {
+    const oldRoom = player.room;
+    broadcastRoomDeparture(player.name, oldRoom, 'player');
     player.room = room.exits[direction];
     return true;
   }
