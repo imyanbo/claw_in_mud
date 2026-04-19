@@ -6,7 +6,7 @@ const db = new Database(__dirname + '/mud.db');
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-const APP_VERSION = process.env.APP_VERSION || 'dev-2026-03-24-1';
+const APP_VERSION = process.env.APP_VERSION || 'dev-2026-04-18-2';
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MS || 7 * 24 * 60 * 60 * 1000);
 const ONLINE_TTL_MS = Number(process.env.ONLINE_TTL_MS || 90 * 1000);
 

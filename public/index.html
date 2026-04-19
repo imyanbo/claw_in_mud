@@ -193,6 +193,9 @@
         return '出口: ' + clickable;
       });
       result = result.replace(/\[play:(\d+)\]/g, (m, num) => clickableSpan('出牌', 'guandan play ' + num));
+      result = result.replace(/\[learn:([^:\]]+):([^\]]+)\]/g, (m, skill, teacher) => {
+        return clickableSpan('学习', `learn ${skill} from ${teacher}`);
+      });
       // 处理方向关键词
       directionKeywords.forEach(dir => {
         const escapedDir = escapeHtml(dir);
@@ -219,6 +222,9 @@
       }
       if (text.includes('战斗落败') || text.includes('💀')) {
         div.style.cssText = 'color: #ff4444; background: rgba(50,0,0,0.3); padding: 10px; border-radius: 4px; margin: 5px 0; border-left: 3px solid #ff4444; font-size: 17px;';
+      }
+      if (text.includes('🔥 恭喜！你的【') && text.includes('】提升到了')) {
+        div.style.cssText = 'color: #ffb347; background: rgba(80,20,0,0.45); padding: 12px; border-radius: 6px; margin: 8px 0; border-left: 4px solid #ff6b35; font-size: 18px; font-weight: bold; text-shadow: 0 0 6px rgba(255,140,0,0.45);';
       }
       
       // 三体宇宙线剧情特殊样式 - 科幻感

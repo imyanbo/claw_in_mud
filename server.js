@@ -12,6 +12,14 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+const WS_HEARTBEAT_INTERVAL_MS = 30000;
+const WS_HEARTBEAT_MISS_LIMIT = 4;
+
+function heartbeat() {
+  this.isAlive = true;
+  this.missedPongs = 0;
+}
+
 // 服务器启动时间
 const serverStartTime = Date.now();
 
@@ -215,7 +223,34 @@ const skillAliases = {
   "beiming": "北冥神功", "zixia": "紫霞神功", "xlongzhang": "降龙十八掌",
   "liumai": "六脉神剑", "dugu": "孤独九剑", "taiji": "太极拳",
   "luoyingshen掌": "落英神掌", "luoying": "落英神掌", "tanzhi": "弹指神通",
-  "yuxiao": "玉箫剑法", "bihai": "碧海潮生曲", "wuxing": "五行八卦掌"
+  "yuxiao": "玉箫剑法", "bihai": "碧海潮生曲", "wuxing": "五行八卦掌",
+  "jibenneigong": "基本内功", "jibenquanfa": "基本拳法", "jibenqinggong": "基本轻功",
+  "lingxizhi": "灵犀指", "tianwaifeixian": "天外飞仙", "danzhishentong": "弹指神通", "yuxiaojianfa": "玉箫剑法"
+};
+
+const skillEnglishNames = {
+  '基本内功': 'jibenneigong',
+  '基本拳法': 'jibenquanfa',
+  '基本轻功': 'jibenqinggong',
+  '罗汉拳': 'luohanquan',
+  '太祖长拳': 'taizuchangquan',
+  '伏虎拳': 'fuhuquan',
+  '九阳神功': 'jiuyang',
+  '九阴真经': 'jiuyin',
+  '北冥神功': 'beiming',
+  '紫霞神功': 'zixia',
+  '易筋经': 'yijinjing',
+  '降龙十八掌': 'xianglongshibazhang',
+  '六脉神剑': 'liumai',
+  '孤独九剑': 'dugu',
+  '太极拳': 'taiji',
+  '落英神掌': 'luoying',
+  '弹指神通': 'tanzhi',
+  '玉箫剑法': 'yuxiaojianfa',
+  '碧海潮生曲': 'bihaichaoshengqu',
+  '五行八卦掌': 'wuxingbaguazhang',
+  '灵犀指': 'lingxizhi',
+  '天外飞仙': 'tianwaifeixian'
 };
 
 const titles = [
@@ -250,6 +285,28 @@ const masters = {
   'ximenchuixue': { school: '万梅山庄', location: '紫禁之巅', skill: '天外飞仙', desc: '剑神西门吹雪', requiredExp: 300 },
   '叶孤城': { school: '白云城', location: '紫禁之巅', skill: '天外飞仙', desc: '白云城主叶孤城', requiredExp: 300 },
   'yegucheng': { school: '白云城', location: '紫禁之巅', skill: '天外飞仙', desc: '白云城主叶孤城', requiredExp: 300 },
+};
+
+const masterSkillLevels = {
+  '岳不群': { '基本内功': 18, '基本拳法': 14, '基本轻功': 13, '紫霞神功': 16 },
+  'yuebuqun': { '基本内功': 18, '基本拳法': 14, '基本轻功': 13, '紫霞神功': 16 },
+  '风清扬': { '基本轻功': 18, '基本拳法': 15, '孤独九剑': 20 },
+  'fengqingyang': { '基本轻功': 18, '基本拳法': 15, '孤独九剑': 20 },
+  '方丈': { '基本内功': 18, '罗汉拳': 16, '基本轻功': 12, '易筋经': 17 },
+  'fangzhang': { '基本内功': 18, '罗汉拳': 16, '基本轻功': 12, '易筋经': 17 },
+  '玄慈': { '基本内功': 17, '罗汉拳': 15, '易筋经': 16 },
+  'xuanci': { '基本内功': 17, '罗汉拳': 15, '易筋经': 16 },
+  '扫地僧': { '基本内功': 22, '易筋经': 21, '北冥神功': 19 },
+  'saodisen': { '基本内功': 22, '易筋经': 21, '北冥神功': 19 },
+  '张三丰': { '基本内功': 20, '基本轻功': 16, '太极拳': 18 },
+  '黄药师': { '基本内功': 16, '落英神掌': 17, '弹指神通': 16, '玉箫剑法': 15, '碧海潮生曲': 15 },
+  'huangyaoshi': { '基本内功': 16, '落英神掌': 17, '弹指神通': 16, '玉箫剑法': 15, '碧海潮生曲': 15 },
+  '陆小凤': { '基本轻功': 17, '灵犀指': 18 },
+  'luxiaofeng': { '基本轻功': 17, '灵犀指': 18 },
+  '西门吹雪': { '基本轻功': 15, '天外飞仙': 19 },
+  'ximenchuixue': { '基本轻功': 15, '天外飞仙': 19 },
+  '叶孤城': { '基本轻功': 15, '天外飞仙': 19 },
+  'yegucheng': { '基本轻功': 15, '天外飞仙': 19 }
 };
 
 // 扬州城区域 (鹿鼎记)
@@ -823,6 +880,26 @@ const schoolPerformDb = {
   }
 };
 
+const skillBooks = {
+  '紫霞神功': ['紫霞秘籍', '紫霞秘笈', '紫霞壁画', '紫霞羊皮卷'],
+  '孤独九剑': ['独孤九剑秘籍', '独孤九剑剑谱', '思过崖壁画', '独孤九剑羊皮卷'],
+  '易筋经': ['易筋经', '易筋经秘籍', '易筋经羊皮卷'],
+  '北冥神功': ['北冥神功秘籍', '北冥残卷', '逍遥羊皮卷'],
+  '太极拳': ['太极拳谱', '太极拳经', '真武壁画'],
+  '落英神掌': ['落英神掌秘籍', '桃花岛壁画', '落英残卷'],
+  '灵犀指': ['灵犀指谱', '灵犀指秘籍'],
+  '天外飞仙': ['天外飞仙剑谱', '飞仙残页'],
+  '罗汉拳': ['罗汉拳谱'],
+  '太祖长拳': ['太祖长拳谱'],
+  '伏虎拳': ['伏虎拳谱'],
+  '九阳神功': ['九阳真经残卷'],
+  '九阴真经': ['九阴真经', '九阴真经残卷'],
+  '弹指神通': ['弹指神通秘籍'],
+  '玉箫剑法': ['玉箫剑谱'],
+  '碧海潮生曲': ['碧海潮生曲谱'],
+  '五行八卦掌': ['五行八卦掌谱']
+};
+
 const npcPerformDb = {
   '岳不群': { school: '华山派', performs: ['紫霞冲霄'] },
   '风清扬': { school: '华山派', performs: ['狂风快剑'] },
@@ -983,6 +1060,8 @@ function createPlayer(name) {
     room: '客栈',
     hp: maxHp, maxHp: maxHp,
     mp: maxMp, maxMp: maxMp,
+    jingli: 100,
+    maxJingli: 100,
     exp: 0, level: 1,
     pvpKills: 0,
     deaths: 0,
@@ -1046,6 +1125,141 @@ function getNpcMeta(name) {
   return npcCatalog[name] || { alias: name.toLowerCase().replace(/\s+/g, '_'), quote: '……', money: 0, loot: [], role: '江湖人物' };
 }
 
+function getMasterDisplayName(masterKey) {
+  const aliasMap = {
+    yuebuqun: '岳不群', fengqingyang: '风清扬', fangzhang: '方丈', xuanci: '玄慈', saodisen: '扫地僧',
+    huangyaoshi: '黄药师', luxiaofeng: '陆小凤', ximenchuixue: '西门吹雪', yegucheng: '叶孤城'
+  };
+  return aliasMap[masterKey] || masterKey;
+}
+
+function getMasterSkillCap(masterKey, skillName) {
+  return Number(masterSkillLevels[masterKey]?.[skillName] || 0);
+}
+
+function getSkillLearnNeed(level) {
+  const lv = Math.max(1, Number(level || 1));
+  return Math.max(1, Math.floor(0.8 * lv * lv + 1.2 * lv));
+}
+
+function getManualSkillCap(skillName) {
+  if (['基本内功', '基本拳法', '基本轻功', '罗汉拳', '太祖长拳', '伏虎拳'].includes(skillName)) return 12;
+  return 8;
+}
+
+function getLearnableSkillsForMaster(masterKey) {
+  const master = masters[masterKey];
+  if (!master?.skill) return [];
+  const list = [master.skill];
+  if (master.school === '华山派') list.push('基本内功', '基本拳法', '基本轻功');
+  if (master.school === '少林寺') list.push('基本内功', '罗汉拳', '基本轻功');
+  if (master.school === '武当派') list.push('基本内功', '太极拳', '基本轻功');
+  if (master.school === '桃花岛') list.push('弹指神通', '玉箫剑法', '碧海潮生曲');
+  if (master.school === '逍遥派') list.push('基本轻功');
+  return [...new Set(list.filter(name => skillDb[name]))];
+}
+
+function hasManualForSkill(player, skillName, roomName) {
+  const manuals = skillBooks[skillName] || [];
+  if (manuals.some(item => player.inventory.includes(item))) return true;
+  const room = getRoom(roomName);
+  const text = `${room?.description || ''} ${(room?.npcs || []).join(' ')}`;
+  return manuals.some(item => text.includes(item) || (item.includes('壁画') && text.includes('壁画')) || (item.includes('羊皮卷') && text.includes('羊皮卷')));
+}
+
+function getLearningSource(player, skillName, explicitTeacher) {
+  const room = getRoom(player.room);
+  const roomNpcs = room?.npcs || [];
+  if (explicitTeacher) {
+    if (masters[explicitTeacher] && roomNpcs.includes(explicitTeacher)) {
+      const skills = getLearnableSkillsForMaster(explicitTeacher);
+      if (skills.includes(skillName)) return { type: 'master', teacher: explicitTeacher };
+    }
+    return null;
+  }
+
+  if (player.master && roomNpcs.includes(player.master)) {
+    const skills = getLearnableSkillsForMaster(player.master);
+    if (skills.includes(skillName)) return { type: 'master', teacher: player.master };
+  }
+
+  if (hasManualForSkill(player, skillName, player.room)) {
+    return { type: 'manual' };
+  }
+  return null;
+}
+
+function getDefaultLearningTeacher(player, skillName) {
+  const room = getRoom(player.room);
+  const roomNpcs = room?.npcs || [];
+  if (player.master && roomNpcs.includes(player.master)) {
+    const skills = getLearnableSkillsForMaster(player.master);
+    if (skills.includes(skillName)) return player.master;
+    return null;
+  }
+  for (const npcName of roomNpcs) {
+    if (masters[npcName]) {
+      const skills = getLearnableSkillsForMaster(npcName);
+      if (skills.includes(skillName)) return npcName;
+    }
+  }
+  return null;
+}
+
+function canLearnSkill(player, skillName, source) {
+  if (!skillDb[skillName]) return '没有这门武功。';
+  if ((player.jingli ?? 100) <= Math.max(10, Math.floor((player.maxJingli ?? 100) * 0.1))) {
+    return '你已经昏昏沉沉，精力不足，无法继续学习武功。';
+  }
+  if (!source) {
+    return '学习武功需要师父当面传授，或你手中有秘籍、书册、壁画、羊皮卷可供参悟。';
+  }
+  let needMaster = '';
+  if (["易筋经", "北冥神功"].includes(skillName) && (!player.master || !["方丈", "玄慈", "扫地僧", "xuanci", "fangzhang", "saodisen"].includes(player.master))) {
+    needMaster = '少林寺';
+  } else if (["紫霞神功", "孤独九剑"].includes(skillName) && (!player.master || !["岳不群", "风清扬", "yuebuqun", "fengqingyang"].includes(player.master))) {
+    needMaster = '华山派';
+  }
+  if (needMaster && source.type !== 'manual') {
+    return `这是${needMaster}绝技，需要拜入${needMaster}门下，再由门中师长当面传授。`;
+  }
+  const current = player.skills[skillName] || { level: 0, exp: 0, learnProgress: 0 };
+  const cap = source.type === 'master' ? getMasterSkillCap(source.teacher, skillName) : getManualSkillCap(skillName);
+  if (cap <= 0) {
+    return source.type === 'master' ? `【${getMasterDisplayName(source.teacher)}】不会这门武功。` : '你手中的秘籍残缺不全，学不了这门武功。';
+  }
+  if ((current.level || 0) >= cap) {
+    return source.type === 'master'
+      ? `你对【${skillName}】的理解已不在【${getMasterDisplayName(source.teacher)}】之下，无法再从他这里精进。`
+      : `你手中这份关于【${skillName}】的秘籍，最多只能帮你参悟到 ${cap} 级。`;
+  }
+  return null;
+}
+
+function applyLearnSkill(player, skillName, source) {
+  if (!player.skills[skillName]) player.skills[skillName] = { level: 0, exp: 0, learnProgress: 0 };
+  const skill = player.skills[skillName];
+  const nextLevel = Math.max(1, (skill.level || 0) + 1);
+  const need = getSkillLearnNeed(nextLevel);
+  const gain = source.type === 'master' ? 1 + Math.max(0, Math.floor((player.先天?.悟性 || 5) / 8)) : 1;
+  const baseCost = 8 + Math.floor(nextLevel * 1.5) + (source.type === 'manual' ? 3 : 0);
+  const cost = Math.max(8, Math.min(35, baseCost));
+  player.jingli = Math.max(0, (player.jingli ?? 100) - cost);
+  skill.learnProgress = Number(skill.learnProgress || 0) + gain;
+  let upgraded = false;
+  if (skill.learnProgress >= need) {
+    skill.learnProgress = 0;
+    skill.level = nextLevel;
+    upgraded = true;
+  }
+  const sourceText = source.type === 'master' ? `在【${getMasterDisplayName(source.teacher)}】的指点下` : '对着秘籍苦苦参悟';
+  const lowEnergy = player.jingli <= Math.max(10, Math.floor((player.maxJingli ?? 100) * 0.1));
+  const progressText = upgraded
+    ? `🔥 恭喜！你的【${skillName}】提升到了 ${skill.level} 级！`
+    : `你对【${skillName}】又多了几分体悟（进度 ${skill.learnProgress}/${need}）。`;
+  return `${sourceText}，${progressText}\n消耗精力 ${cost} 点，当前精力 ${player.jingli}/${player.maxJingli}.${lowEnergy ? '\n你只觉头昏眼花，短时间内已无法继续学习武功。' : ''}`;
+}
+
 function getRoomByNpcName(npcName) {
   for (const [roomName, room] of Object.entries(rooms)) {
     if ((room.npcs || []).includes(npcName)) return roomName;
@@ -1071,7 +1285,7 @@ function getNpcEntranceStyle(npcName, mode = 'arrival') {
 function broadcastRoomDeparture(leaverName, roomName, type = 'player') {
   const leaveText = type === 'npc' ? `${leaverName}${getNpcEntranceStyle(leaverName, 'departure')}` : `${leaverName}行色匆匆地离开了。`;
   for (const [name, client] of Object.entries(onlinePlayers)) {
-    if (players[name]?.room === roomName) {
+    if (name !== leaverName && players[name]?.room === roomName) {
       client.send(`【系统】${leaveText}\n>`);
     }
   }
@@ -1080,7 +1294,7 @@ function broadcastRoomDeparture(leaverName, roomName, type = 'player') {
 function broadcastRoomArrivalNotice(arriverName, roomName, type = 'player') {
   const arriveText = type === 'npc' ? `${arriverName}${getNpcEntranceStyle(arriverName, 'arrival')}` : `${arriverName}走了过来。`;
   for (const [name, client] of Object.entries(onlinePlayers)) {
-    if (players[name]?.room === roomName) {
+    if (name !== arriverName && players[name]?.room === roomName) {
       client.send(`【系统】${arriveText}\n>`);
     }
   }
@@ -1362,22 +1576,23 @@ function getNpcAttitudeLine(npcName, player) {
   return '';
 }
 
-function shouldTriggerNpcGreeting(npcName, player) {
+function shouldTriggerNpcGreeting(npcName, player, force = false) {
   const now = Date.now();
   if (!npcGreetingCooldown[player.name]) npcGreetingCooldown[player.name] = {};
   const last = npcGreetingCooldown[player.name][npcName] || 0;
-  if (now - last < 45 * 1000) return false;
+  if (!force && now - last < 45 * 1000) return false;
   npcGreetingCooldown[player.name][npcName] = now;
   return true;
 }
 
-function collectNpcGreetingLines(player, roomName) {
+function collectNpcGreetingLines(player, roomName, options = {}) {
   const room = getRoom(roomName || player.room);
   if (!room) return [];
+  const force = !!options.force;
   const lines = [];
   for (const npcName of room.npcs || []) {
     if (!importantNpcNames.has(npcName)) continue;
-    if (!shouldTriggerNpcGreeting(npcName, player)) continue;
+    if (!shouldTriggerNpcGreeting(npcName, player, force)) continue;
     const line = getNpcProactiveLine(npcName, player);
     if (line) lines.push(`【${npcName}】${line}`);
   }
@@ -1807,7 +2022,8 @@ function recalculateDerivedStats(player) {
   const baseAttr = player.先天 || { 根骨: 5, 悟性: 5, 经脉: 5, 福缘: 5 };
   const neigongLevel = getNeigongLevel(player);
   const wugongLevel = getWugongLevel(player);
-  player.maxMp = 50 + baseAttr.经脉 * 5 + neigongLevel * 6;
+  const baseInnerSkillLevel = getSkillLevel(player, '基本内功');
+  player.maxMp = 50 + baseAttr.经脉 * 5 + neigongLevel * 6 + baseInnerSkillLevel * 3;
   player.maxHp = 100 + baseAttr.根骨 * 10 + neigongLevel * 3 + Math.floor(player.maxMp * 0.18);
   player.外功攻击 = 10 + baseAttr.根骨 * 2 + wugongLevel * 2;
   player.内功攻击 = Math.floor(neigongLevel * 1.2);
@@ -2277,7 +2493,7 @@ function formatOutputBrief(player, message) {
       output += `\n【店铺】输入 shop 查看商品\n`;
     }
   }
-  const greetingLines = collectNpcGreetingLines(player, player.room);
+  const greetingLines = collectNpcGreetingLines(player, player.room, { force: /^你向|你走进了|欢迎回来|注册成功|你登上/.test(message) });
   if (greetingLines.length) output += `\n${greetingLines.join('\n')}\n`;
   output += `\n> `;
   return output;
@@ -2311,24 +2527,33 @@ function formatOutput(player, message) {
   if (player.weapon || player.armor) {
     output += `装备: ${player.weapon || '无'}(攻+${weaponDmg}) ${player.armor || '无'}(防+${armorDef})\n`;
   }
-  const greetingLines = collectNpcGreetingLines(player, player.room);
+  const greetingLines = collectNpcGreetingLines(player, player.room, { force: /^你向|你走进了|欢迎回来|注册成功|你登上/.test(message) });
   if (greetingLines.length) output += `\n${greetingLines.join('\n')}\n`;
   output += '\n>';
   return output;
 }
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   let player = null;
   let state = 'welcome';
   let tempName = '';
 
+  ws.isAlive = true;
+  ws.missedPongs = 0;
+  ws.on('pong', heartbeat);
+
+  const remoteIp = req?.headers?.['cf-connecting-ip'] || req?.headers?.['x-forwarded-for'] || req?.socket?.remoteAddress || 'unknown';
+  console.log(`[WebSocket连接] ip=${remoteIp}`);
+
   ws.send('\n🦞 欢迎来到【武侠世界】MUD！\n\n请选择:\n1. 登录 (login)\n2. 注册 (register)\n> ');
 
   ws.on('error', (err) => {
-    console.log(`[WebSocket错误] ${err.message}`);
+    console.log(`[WebSocket错误] ip=${remoteIp} player=${player?.name || '-'} message=${err.message}`);
   });
 
-  ws.on('close', () => {
+  ws.on('close', (code, reasonBuffer) => {
+    const reason = Buffer.isBuffer(reasonBuffer) ? reasonBuffer.toString() : (reasonBuffer || '');
+    console.log(`[WebSocket关闭] ip=${remoteIp} player=${player?.name || '-'} code=${code} reason=${reason || '-'} alive=${ws.isAlive}`);
     if (player && players[player.name]) {
       console.log(`[玩家断开] ${player.name}`);
       if (users[player.name]) {
@@ -2579,6 +2804,8 @@ wss.on('connection', (ws) => {
             // 基本属性
             exp: player.exp, level: player.level, coin: player.coin,
             silver: player.silver, gold: player.gold,
+            jingli: player.jingli,
+            maxJingli: player.maxJingli,
             guandanStats: player.guandanStats,
             hp: player.hp, mp: player.mp,
             maxHp: player.maxHp, maxMp: player.maxMp,
@@ -2933,14 +3160,23 @@ wss.on('connection', (ws) => {
         case 'skills':
         case 'performs':
           if (args && masters[args]) {
-            const m = masters[args];
-            ws.send(`【\${args}】可传授技能: ${m.skill} - ${skillDb[m.skill] ? skillDb[m.skill].desc : '绝技'}\n>`);
+            const learnable = getLearnableSkillsForMaster(args);
+            const lines = learnable.map(name => {
+              const alias = skillEnglishNames[name] || '';
+              return `${name}（${alias}） (${getMasterSkillCap(args, name)}级) - ${skillDb[name]?.desc || '武学'} [learn:${name}:${args}]`;
+            });
+            ws.send(`【${getMasterDisplayName(args)}】可传授武功:\n${lines.join('\n')}\n\n可输入 learn [武功名] from ${args} 当面学习\n>`);
             break;
           }
           let skillMsg = '\n【技能】\n';
           for (const [name, sk] of Object.entries(player.skills)) {
-            skillMsg += `${name}: ${sk.level}级 (经验: ${sk.exp})\n`;
+            const nextNeed = getSkillLearnNeed(Math.max(1, Number(sk.level || 0) + 1));
+            const alias = skillEnglishNames[name] || '';
+            const teacher = getDefaultLearningTeacher(player, name);
+            const learnLink = teacher ? ` [learn:${name}:${teacher}]` : '';
+            skillMsg += `${name}（${alias}）: ${sk.level}级 (经验: ${sk.exp || 0}, 研习: ${sk.learnProgress || 0}/${nextNeed})${learnLink}\n`;
           }
+          skillMsg += `\n精力: ${player.jingli ?? 100}/${player.maxJingli ?? 100}\n`;
           const performs = Object.entries(schoolPerformDb[player.school] || {});
           if (performs.length) {
             skillMsg += '\n【可用绝招】\n';
@@ -2952,35 +3188,31 @@ wss.on('connection', (ws) => {
             skillMsg += '\n输入 perform 绝招名 目标名 施展绝招\n';
           }
           skillMsg += '\n输入 learn [技能名] 学习新技能\n';
+          skillMsg += '输入 skills [师父名] 查看该师父可传授武功\n';
           ws.send(skillMsg + '\n>');
           break;
 
         case 'learn':
-          if (args && (skillDb[args] || skillAliases[args])) {
-            const skillName = skillAliases[args] || args;
-            if (player.skills[skillName]) {
-              ws.send('你已学会此技能。\n>');
-            } else if (player.exp >= 50) {
-              // 检查门派技能限制
-              let needMaster = "";
-              if (["易筋经", "北冥神功"].includes(skillName) && (!player.master || !["方丈", "玄慈", "扫地僧", "xuanci", "fangzhang", "saodisen"].includes(player.master))) {
-                needMaster = "少林寺";
-              } else if (["紫霞神功", "孤独九剑"].includes(skillName) && (!player.master || !["岳不群", "风清扬", "yuebuqun", "fengqingyang"].includes(player.master))) {
-                needMaster = "华山派";
-              }
-              if (needMaster) {
-                ws.send(`这是${needMaster}绝技，需要拜入${needMaster}门下才能学习。输入 "find" 查看拜师地点。\n>`);
-                break;
-              }
-              player.skills[skillName] = { level: 1, exp: 0 };
-              player.exp -= 50;
-              saveProgress();
-              ws.send(`恭喜学会【\${args}】！消耗50经验。\n>`);
-            } else {
-              ws.send('经验不足，需要50点经验。\n>');
+          if (args) {
+            const fromMatch = args.match(/^(.+?)\s+from\s+(.+)$/i);
+            const rawSkill = fromMatch ? fromMatch[1].trim() : args.trim();
+            const teacherArg = fromMatch ? fromMatch[2].trim() : null;
+            const skillName = skillAliases[rawSkill] || rawSkill;
+            if (!skillDb[skillName]) {
+              ws.send('请输入正确的技能名。可用技能: ' + Object.keys(skillDb).join(', ') + '\n>');
+              break;
             }
+            const source = getLearningSource(player, skillName, teacherArg);
+            const err = canLearnSkill(player, skillName, source);
+            if (err) {
+              ws.send(err + '\n>');
+              break;
+            }
+            const result = applyLearnSkill(player, skillName, source);
+            saveProgress();
+            ws.send(result + '\n>');
           } else {
-            ws.send('请输入正确的技能名。可用技能: ' + Object.keys(skillDb).join(', ') + '\n>');
+            ws.send('用法: learn [技能名] 或 learn [技能名] from [师父名]\n>');
           }
           break;
 
@@ -4084,6 +4316,7 @@ wss.on('connection', (ws) => {
 ║ 【后天属性】(战斗属性)                     ║
 ║ 气血: ${player.hp}/${player.maxHp}                          ║
 ║ 内力: ${player.mp}/${player.maxMp}                          ║
+║ 精力: ${player.jingli ?? 100}/${player.maxJingli ?? 100}                          ║
 ║ 武功等级: ${getWugongLevel(player)}  内功等级: ${getNeigongLevel(player)}           ║
 ║ 外功攻击: ${player.外功攻击}  内功攻击: ${player.内功攻击}          ║
 ║ 防御: ${player.防御}  身法: ${player.身法}                    ║
@@ -4251,11 +4484,15 @@ wss.on('connection', (ws) => {
             ws.send('你还没有拜师。\n>');
           } else {
             const sf = masters[player.master];
+            const teachList = getLearnableSkillsForMaster(player.master)
+              .map(name => `${name}(${getMasterSkillCap(player.master, name)}级)`)
+              .join('、');
             ws.send(`【师父信息】
 师父: ${player.master}
 门派: ${player.school}
 传授技能: ${sf ? sf.skill : '未知'}
-说明: 输入 "传功" 向师父学习技能
+武学境界: ${teachList || '未知'}
+说明: 输入 "skills ${player.master}" 查看详情，输入 "learn 武功名 from ${player.master}" 学习
 `);
           }
           break;
@@ -4868,7 +5105,35 @@ app.get('/api/npc/llm-config', (req, res) => {
   });
 });
 
+const wsHeartbeatTimer = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      ws.missedPongs = (ws.missedPongs || 0) + 1;
+      if (ws.missedPongs >= WS_HEARTBEAT_MISS_LIMIT) {
+        console.log(`[WebSocket心跳] 连续 ${ws.missedPongs} 次未收到 pong，主动终止连接`);
+        ws.terminate();
+        return;
+      }
+    } else {
+      ws.missedPongs = 0;
+    }
+
+    ws.isAlive = false;
+    try {
+      ws.ping();
+    } catch (err) {
+      console.log(`[WebSocket心跳错误] ${err.message}`);
+      ws.terminate();
+    }
+  });
+}, WS_HEARTBEAT_INTERVAL_MS);
+
+wss.on('close', () => {
+  clearInterval(wsHeartbeatTimer);
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`武侠MUD已启动: http://localhost:${PORT}`);
+  console.log(`[WebSocket心跳] 已启用，间隔 ${WS_HEARTBEAT_INTERVAL_MS}ms，容忍 ${WS_HEARTBEAT_MISS_LIMIT} 次丢失 pong`);
 });
