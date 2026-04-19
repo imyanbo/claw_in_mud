@@ -313,19 +313,31 @@ const masterSkillLevels = {
 const rooms = {
   '丽春院': {
     description: '扬州城内最著名的青楼，灯火通明，丝竹之声不绝。这里是韦小宝小时候长大的地方。',
-    exits: { '东': '扬州街', '西': '扬州小巷' },
+    exits: { '西': '扬州小巷' },
     npcs: ['老鸨', '春花', '秋月'],
     shop: null
   },
-  '扬州街': {
-    description: '扬州城最繁华的街道，两旁店铺林立，小商贩的吆喝声此起彼伏。往东可以远远望见一座新城的灯火。',
-    exits: { '东': '东郊驿道', '赌场': '赌场', '西': '丽春院', '南': '扬州码头', '北': '扬州城门' },
+  '扬州街北': {
+    description: '扬州主街北段，离城门不远，人流熙攘。东边挂着客栈招牌，西边则是一条通往药店和丽春院方向的偏巷。',
+    exits: { '东': '客栈', '西': '扬州小巷', '南': '扬州街中', '北': '扬州城门' },
     npcs: ['小贩', '行人', '官兵'],
+    shop: null
+  },
+  '扬州街中': {
+    description: '扬州主街正中，两旁店肆林立，吆喝声不绝于耳。再往南便离码头不远。',
+    exits: { '东': '武器铺', '西': '药店', '南': '扬州街南', '北': '扬州街北' },
+    npcs: ['小贩', '行人', '官兵'],
+    shop: null
+  },
+  '扬州街南': {
+    description: '扬州主街南段，空气里渐渐有了水汽和河风，往南便是码头。',
+    exits: { '东': '防具铺', '西': '赌场', '南': '扬州码头', '北': '扬州街中' },
+    npcs: ['脚夫', '行人'],
     shop: null
   },
   '东郊驿道': {
     description: '扬州城东郊的驿道，向东延伸至凤栖古道。',
-    exits: { '西': '扬州街', '东': '凤栖古道' },
+    exits: { '西': '扬州街中', '东': '凤栖古道' },
     npcs: ['驿卒'],
     shop: null,
     area: '江湖'
@@ -374,13 +386,13 @@ const rooms = {
   },
   '赌场': {
     description: '扬州城内最大的赌场，乌烟瘴气，骰子声、叫喝声此起彼伏。角落里新摆了三张掼蛋牌桌，分别收铜钱、银两、黄金做底注。墙上还贴着说明：输入 guandan 可查看规则，输入 guandan list 可看桌级，赢钱靠手气，输钱别砸桌子。',
-    exits: { '西': '扬州街' },
+    exits: { '北': '扬州小巷' },
     npcs: ['赌徒', '庄家', '荷官', '牌桌老李', '牌桌老周', '牌桌老孙'],
     shop: null
   },
   '扬州码头': {
     description: '运河边的码头，船只来来往往，货物堆积如山。远处停着一艘远洋客轮。',
-    exits: { '北': '扬州街', '东': '运河', '上船': '远洋客轮甲板', '客轮': '远洋客轮甲板' },
+    exits: { '北': '扬州街南', '东': '运河', '上船': '远洋客轮甲板', '客轮': '远洋客轮甲板' },
     npcs: ['船夫', '脚夫'],
     shop: null
   },
@@ -391,14 +403,14 @@ const rooms = {
     shop: null
   },
   '扬州小巷': {
-    description: '一条偏僻的小巷，两边是低矮的民房。',
-    exits: { '东': '丽春院', '北': '扬州城门' },
+    description: '一条偏僻的小巷，两边是低矮的民房。北边是药店，南边是赌场，东边便是灯火通明的丽春院，西边可折回主街。',
+    exits: { '北': '药店', '南': '赌场', '东': '丽春院', '西': '扬州街北' },
     npcs: ['流浪猫'],
     shop: null
   },
   '扬州城门': {
     description: '扬州城的北门，城门高大坚固，官兵把守严密。',
-    exits: { '南': '扬州街', '北': '扬州郊外', '西': '扬州小巷' },
+    exits: { '南': '扬州街北', '北': '扬州郊外' },
     npcs: ['官兵', '守门士兵'],
     shop: null
   },
@@ -546,25 +558,25 @@ const rooms = {
   // 武器铺
   '武器铺': {
     description: '武器铺内挂满了各种兵器，墙上挂着屠龙刀和倚天剑。',
-    exits: { '南': '扬州街' },
+    exits: { '西': '扬州街中' },
     npcs: ['铁匠'],
     shop: 'weapon'
   },
   '防具铺': {
     description: '防具铺里挂着各种护甲，角落里还有一件软猬甲。',
-    exits: { '南': '扬州街' },
+    exits: { '西': '扬州街南' },
     npcs: ['裁缝'],
     shop: 'armor'
   },
   '药店': {
     description: '药店内弥漫着药香，柜台后摆满了各种药材。',
-    exits: { '南': '扬州街' },
+    exits: { '东': '扬州街中', '南': '扬州小巷' },
     npcs: ['药师'],
     shop: 'medicine'
   },
   '客栈': {
-    description: '江湖客栈大厅，门口挂着两盏大红灯笼，柜台上摆着酒坛。',
-    exits: { '南': '扬州街', '北': '练功房', '上': '客房' },
+    description: '江湖客栈大厅，门口挂着两盏大红灯笼，柜台上摆着酒坛。客栈旁还开着兵器和护具铺子。',
+    exits: { '西': '扬州街北', '北': '练功房', '上': '客房' },
     npcs: ['店小二', '客栈老板'],
     shop: null
   },
@@ -602,7 +614,7 @@ const rooms = {
   '藏经阁': {
     description: '藏经阁内书架林立，收藏了数千卷佛经和武学典籍。扫地僧正在角落打扫。',
     exits: { '西': '少林寺大院' },
-    npcs: ['扫地僧', 'saodisen', 'monk', '藏经阁长老'],
+    npcs: ['扫地僧', '藏经阁长老'],
     shop: null
   },
   '罗汉堂': {
@@ -619,8 +631,8 @@ const rooms = {
   },
   '方丈室': {
     description: '方丈室庄严素雅，屋内陈设简单。一位白眉老僧正在打坐。',
-    exits: { '南': '少林寺大院' },
-    npcs: ['方丈', 'fangzhang', 'xuanci', '玄慈'],
+    exits: { '南': '少林寺大院', '东': '少林僧房' },
+    npcs: ['方丈', '玄慈'],
     shop: null
   },
   // 华山派 (笑傲江湖)
@@ -686,7 +698,13 @@ const rooms = {
   },
   '少林练功房': {
     description: '少林寺练功房，屋内金砖铺地，宽敞明亮。',
-    exits: { '东': '罗汉堂' },
+    exits: { '东': '罗汉堂', '南': '少林僧房' },
+    npcs: [],
+    shop: null
+  },
+  '少林僧房': {
+    description: '少林僧房陈设朴素，木榻、蒲团与经卷摆放整齐。这里既可打坐调息，也可小憩恢复体力。',
+    exits: { '西': '方丈室', '北': '少林练功房' },
     npcs: [],
     shop: null
   },
@@ -920,10 +938,8 @@ const mapFull = `
    【少林寺山路】          【华山山脚】
          |                      |
     【扬州郊外】----------【扬州城】←←→【凤栖城】
-                            |              |
-                        【客栈】         【】
-                            |
-                        【扬州码头】
+         |                    |
+     【扬州城门】          【扬州码头】
                               |
                       【远洋客轮甲板】→【新港外湾】→【临海新港城】
 
@@ -932,16 +948,41 @@ const mapFull = `
 
 const mapYangzhou = `
 ====================【扬州城区域】(鹿鼎记)====================
+                    【扬州郊外】
+                        |
                     【扬州城门】
                         |
-    【扬州小巷】←→【扬州街】←→【赌场】
+                   【扬州街北】
+                    /       \
+                 西/         \东
+                  /           \
+            【扬州小巷】      【客栈】
+            /   |   \          |
+         北/   南|   \东       |北
+          /      |    \        |
+      【药店】 【赌场】 【丽春院】 【练功房】
+          |                       
+          |东                     |下
+          |                       |
+                 【扬州街中】
+                /         \
+             西/           \东
+              /             \
+           【药店】         【武器铺】
+                \           /
+                 \         /
+                  【扬州街南】
+                 /         \
+              西/           \东
+               /             \
+            【赌场】         【防具铺】
+                  |
+               【扬州码头】
+                  |
+                【运河】
                         |
-    【丽春院】←←    |
-        |         【扬州码头】←→【运河】
-        |
-    【客栈】(练功房/客房)
-        |
-【武器铺】【防具铺】【药店】
+                      【运河】
+
 著名地点: 丽春院(韦小宝成长地)
 `;
 
@@ -1012,7 +1053,7 @@ const mapFengqi = `
                    |
               【东郊驿道】
                    |
-              【扬州街】
+              【扬州街中】
 
 区域介绍:
 • 迎风客栈: 江湖中人落脚之处（中心枢纽）
@@ -1020,7 +1061,7 @@ const mapFengqi = `
 • 四海镖局: 护镖任务
 • 六扇门分署: 官府任务
 
-前往方式: 扬州街 -> 东 -> 凤栖城
+前往方式: 扬州街中 -> 东 -> 凤栖城
 `;
 
 // 出身模板
@@ -1133,6 +1174,11 @@ function getMasterDisplayName(masterKey) {
   return aliasMap[masterKey] || masterKey;
 }
 
+function isSameMaster(a, b) {
+  if (!a || !b) return false;
+  return a === b || getMasterDisplayName(a) === getMasterDisplayName(b);
+}
+
 function getMasterSkillCap(masterKey, skillName) {
   return Number(masterSkillLevels[masterKey]?.[skillName] || 0);
 }
@@ -1171,9 +1217,11 @@ function getLearningSource(player, skillName, explicitTeacher) {
   const room = getRoom(player.room);
   const roomNpcs = room?.npcs || [];
   if (explicitTeacher) {
-    if (masters[explicitTeacher] && roomNpcs.includes(explicitTeacher)) {
-      const skills = getLearnableSkillsForMaster(explicitTeacher);
-      if (skills.includes(skillName)) return { type: 'master', teacher: explicitTeacher };
+    if (!isSameMaster(explicitTeacher, player.master)) return null;
+    const actualTeacher = (roomNpcs || []).find(npcName => isSameMaster(npcName, explicitTeacher));
+    if (actualTeacher && masters[actualTeacher]) {
+      const skills = getLearnableSkillsForMaster(actualTeacher);
+      if (skills.includes(skillName)) return { type: 'master', teacher: actualTeacher };
     }
     return null;
   }
@@ -1403,7 +1451,7 @@ function getRumorText(npcName, topic = '扬州城近况') {
   if (npcName === '情报贩子') {
     const pool = [
       '情报贩子把声音压得极低：「码头最近有批货不走官道，背后的人不简单。」',
-      '情报贩子指尖轻敲桌面：「扬州街上那几个生面孔，不像做买卖的，像是踩点的。」',
+      '情报贩子指尖轻敲桌面：「扬州主街上那几个生面孔，不像做买卖的，像是踩点的。」',
       '情报贩子冷笑一声：「你若真想知道谁在城里搅局，就别只盯着明面上的人。」'
     ];
     return pool[Math.floor(Math.random() * pool.length)];
@@ -1493,7 +1541,16 @@ function formatNpcName(name) {
 }
 
 function formatNpcList(names = []) {
-  return names.map(name => formatNpcName(name)).join('、');
+  const seen = new Set();
+  const unique = [];
+  for (const name of names) {
+    const meta = getNpcMeta(name);
+    const key = meta.alias || name;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(name);
+  }
+  return unique.map(name => formatNpcName(name)).join('、');
 }
 
 function resolveNpcName(input, room) {
@@ -2521,7 +2578,7 @@ function formatOutput(player, message) {
   let armorDef = player.armor ? armors[player.armor].defense : 0;
   output += `\n【${player.name}】${player.title}\n`;
   output += `根骨:${player.先天.根骨} 悟性:${player.先天.悟性} 经脉:${player.先天.经脉} 福缘:${player.先天.福缘}\n`;
-  output += `HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp}\n`;
+  output += `HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli ?? 100}/${player.maxJingli ?? 100}\n`;
   output += `攻击:${player.外功攻击} 防御:${player.防御} 身法:${player.身法}\n`;
   output += `经验:${player.exp} 铜钱:${player.coin}\n`;
   if (player.weapon || player.armor) {
@@ -2602,6 +2659,7 @@ wss.on('connection', (ws, req) => {
         // 20秒后醒来
         player.sleeping = false;
         player.hp = player.maxHp;
+        player.jingli = player.maxJingli ?? 100;
         // 根据恢复情况给出不同提示
         let wakeMsg;
         if (player.hp >= player.maxHp * 0.8) {
@@ -2611,7 +2669,7 @@ wss.on('connection', (ws, req) => {
         } else {
           wakeMsg = '一觉醒来，你感觉腰酸背痛';
         }
-        ws.send(wakeMsg + '。\n【当前】HP: ' + player.hp + '/' + player.maxHp + '\n>');
+        ws.send(wakeMsg + '。\n【当前】HP: ' + player.hp + '/' + player.maxHp + ' STA: ' + player.jingli + '/' + (player.maxJingli ?? 100) + '\n>');
         saveProgress();
         return;
       } else {
@@ -2686,7 +2744,8 @@ wss.on('connection', (ws, req) => {
         const welcomeMsg = '\n╔════════════════════════════════════╗\n' +
 '║   欢迎' + tempName + '登陆武侠世界！         ║\n' +
 '║   当前在线玩家: ' + onlineCount + '人               ║\n' +
-'║   江湖儿女江湖老，一片冰心在玉壶       ║\n' +
+'║   江湖儿女江湖老，烟雨楼台烟雨深   ║\n' +
+'║   十载江湖磨傲骨，一片冰心在玉壶   ║\n' +
 '║   世界已经运行了' + uptime.days + '天' + uptime.hours + '小时' + uptime.minutes + '分钟    ║\n' +
 '╚════════════════════════════════════╝\n';
         ws.send(welcomeMsg);
@@ -2902,8 +2961,8 @@ wss.on('connection', (ws, req) => {
         
         case 'sleep':
         case '睡觉':
-          // 检查是否在客栈客房
-          if (player.room !== '客房') {
+          // 检查是否在可休息房间
+          if (!['客房', '少林僧房'].includes(player.room)) {
             ws.send('这不是你睡觉的地方。\n>');
             break;
           }
@@ -2921,6 +2980,7 @@ wss.on('connection', (ws, req) => {
             if (player && player.sleeping) {
               player.sleeping = false;
               player.hp = player.maxHp;
+              player.jingli = player.maxJingli ?? 100;
               // 根据恢复情况给出不同提示
               let wakeMsg;
               if (player.hp >= player.maxHp * 0.8) {
@@ -2930,7 +2990,7 @@ wss.on('connection', (ws, req) => {
               } else {
                 wakeMsg = '一觉醒来，你感觉腰酸背痛';
               }
-              ws.send(wakeMsg + '。\n【当前】HP: ' + player.hp + '/' + player.maxHp + '\n>');
+              ws.send(wakeMsg + '。\n【当前】HP: ' + player.hp + '/' + player.maxHp + ' STA: ' + player.jingli + '/' + (player.maxJingli ?? 100) + '\n>');
               saveProgress();
             }
           }, 20000);
@@ -3160,12 +3220,17 @@ wss.on('connection', (ws, req) => {
         case 'skills':
         case 'performs':
           if (args && masters[args]) {
-            const learnable = getLearnableSkillsForMaster(args);
+            if (!isSameMaster(args, player.master)) {
+              ws.send('你只能查看自己师傅传授的武功。\n>');
+              break;
+            }
+            const teacherInRoom = (getRoom(player.room)?.npcs || []).find(npcName => isSameMaster(npcName, args)) || args;
+            const learnable = getLearnableSkillsForMaster(teacherInRoom);
             const lines = learnable.map(name => {
               const alias = skillEnglishNames[name] || '';
-              return `${name}（${alias}） (${getMasterSkillCap(args, name)}级) - ${skillDb[name]?.desc || '武学'} [learn:${name}:${args}]`;
+              return `${name}（${alias}） (${getMasterSkillCap(teacherInRoom, name)}级) - ${skillDb[name]?.desc || '武学'} [learn:${name}:${teacherInRoom}]`;
             });
-            ws.send(`【${getMasterDisplayName(args)}】可传授武功:\n${lines.join('\n')}\n\n可输入 learn [武功名] from ${args} 当面学习\n>`);
+            ws.send(`【${getMasterDisplayName(teacherInRoom)}】可传授武功:\n${lines.join('\n')}\n\n可输入 learn [武功名] from ${teacherInRoom} 当面学习\n>`);
             break;
           }
           let skillMsg = '\n【技能】\n';
@@ -3176,7 +3241,7 @@ wss.on('connection', (ws, req) => {
             const learnLink = teacher ? ` [learn:${name}:${teacher}]` : '';
             skillMsg += `${name}（${alias}）: ${sk.level}级 (经验: ${sk.exp || 0}, 研习: ${sk.learnProgress || 0}/${nextNeed})${learnLink}\n`;
           }
-          skillMsg += `\n精力: ${player.jingli ?? 100}/${player.maxJingli ?? 100}\n`;
+          skillMsg += `\nSTA: ${player.jingli ?? 100}/${player.maxJingli ?? 100}\n`;
           const performs = Object.entries(schoolPerformDb[player.school] || {});
           if (performs.length) {
             skillMsg += '\n【可用绝招】\n';
@@ -4003,9 +4068,9 @@ wss.on('connection', (ws, req) => {
           } else {
             let fightHint = '这里没有敌人可以战斗。\n';
             if (player.room === '练功房' || player.room === '客栈') {
-              fightHint += '提示: 扬州街、赌场、华山派、少林寺等地有敌人\n';
+              fightHint += '提示: 扬州街北、扬州街中、扬州街南、赌场、华山派、少林寺等地有敌人\n';
             } else if (!room3 || room3.npcs.length === 0) {
-              fightHint += '提示: 客栈大厅、扬州街、赌场等地有敌人\n';
+              fightHint += '提示: 客栈大厅、扬州街北、扬州街中、扬州街南、赌场等地有敌人\n';
             }
             ws.send(fightHint + '>');
           }
@@ -4314,9 +4379,7 @@ wss.on('connection', (ws, req) => {
 ║  福缘: ${player.先天.福缘}  影响暴击、奇遇          ║
 ╠══════════════════════════════════════╣
 ║ 【后天属性】(战斗属性)                     ║
-║ 气血: ${player.hp}/${player.maxHp}                          ║
-║ 内力: ${player.mp}/${player.maxMp}                          ║
-║ 精力: ${player.jingli ?? 100}/${player.maxJingli ?? 100}                          ║
+║ HP: ${player.hp}/${player.maxHp}  MP: ${player.mp}/${player.maxMp}  STA: ${player.jingli ?? 100}/${player.maxJingli ?? 100} ║
 ║ 武功等级: ${getWugongLevel(player)}  内功等级: ${getNeigongLevel(player)}           ║
 ║ 外功攻击: ${player.外功攻击}  内功攻击: ${player.内功攻击}          ║
 ║ 防御: ${player.防御}  身法: ${player.身法}                    ║
@@ -4887,7 +4950,8 @@ ETO组织正在为"他们"的到来做准备...
               const welcomeMsg2 = '\n╔════════════════════════════════════╗\n' +
 '║   欢迎' + reconnectName + '登陆武侠世界！         ║\n' +
 '║   当前在线玩家: ' + onlineCount + '人               ║\n' +
-'║   江湖儿女江湖老，一片冰心在玉壶       ║\n' +
+'║   江湖儿女江湖老，烟雨楼台烟雨深   ║\n' +
+'║   十载江湖磨傲骨，一片冰心在玉壶   ║\n' +
 '║   世界已经运行了' + uptime.days + '天' + uptime.hours + '小时' + uptime.minutes + '分钟    ║\n' +
 '╚════════════════════════════════════╝\n';
               ws.send(welcomeMsg2);
