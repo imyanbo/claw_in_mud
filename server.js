@@ -1334,7 +1334,7 @@ function broadcastRoomDeparture(leaverName, roomName, type = 'player') {
   const leaveText = type === 'npc' ? `${leaverName}${getNpcEntranceStyle(leaverName, 'departure')}` : `${leaverName}行色匆匆地离开了。`;
   for (const [name, client] of Object.entries(onlinePlayers)) {
     if (name !== leaverName && players[name]?.room === roomName) {
-      client.send(`【系统】${leaveText}\n>`);
+      client.send(`${leaveText}\n>`);
     }
   }
 }
@@ -1343,7 +1343,7 @@ function broadcastRoomArrivalNotice(arriverName, roomName, type = 'player') {
   const arriveText = type === 'npc' ? `${arriverName}${getNpcEntranceStyle(arriverName, 'arrival')}` : `${arriverName}走了过来。`;
   for (const [name, client] of Object.entries(onlinePlayers)) {
     if (name !== arriverName && players[name]?.room === roomName) {
-      client.send(`【系统】${arriveText}\n>`);
+      client.send(`${arriveText}\n>`);
     }
   }
 }
