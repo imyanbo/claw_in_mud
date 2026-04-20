@@ -1,10 +1,11 @@
 {
-  "name": "mud-game",
+  "name": "claw-in-mud",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Web MUD server for claw_in_mud dev branch",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "test": "echo \"No automated tests yet\"",
     "lobster": "node lobster-client.js",
     "lobster:squad": "node lobster-squad.js"
   },

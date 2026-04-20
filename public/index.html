@@ -147,7 +147,7 @@
     
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const APP_STORAGE_VERSION_KEY = 'mud_app_version';
-    const CLIENT_BUILD = 'dev-2026-03-24-1';
+    const CLIENT_BUILD = 'dev-2026-04-20-1';
     let sessionToken = localStorage.getItem('mud_session');
     let playerName = localStorage.getItem('mud_player');
     let serverVersion = null;
@@ -161,6 +161,7 @@
     const directionKeywords = ['东', '南', '西', '北', '东北', '东南', '西北', '西南', '上', '下', '前', '后', '左', '右', '进', '出', '入', '返', '回', '去', '来', '折返', '返回'];
     const placeKeywords = ['铁匠铺', '杂货铺', '赌场', '武馆', '镖局', '药店', '客栈']; // 可点击的地名
     const npcPromptTemplate = 'ask __NPC__ about '; 
+    const npcNamePattern = /[A-Za-z0-9_\u4e00-\u9fa5]+/;
     
     function escapeHtml(text) {
       return text
@@ -195,6 +196,14 @@
       result = result.replace(/\[play:(\d+)\]/g, (m, num) => clickableSpan('出牌', 'guandan play ' + num));
       result = result.replace(/\[learn:([^:\]]+):([^\]]+)\]/g, (m, skill, teacher) => {
         return clickableSpan('学习', `learn ${skill} from ${teacher}`);
+      });
+      result = result.replace(/你看到:\s*([^\n<]+)/g, (full, seenPart) => {
+        const clickableSeen = seenPart.replace(/([A-Za-z0-9_\u4e00-\u9fa5]+)(?=、|\n|$)/g, (m, name) => {
+          if (!npcNamePattern.test(name)) return m;
+          if (name.includes('走了过来')) return m;
+          return clickableSpan(name, `talk ${name}`);
+        });
+        return '你看到: ' + clickableSeen;
       });
       // 处理方向关键词
       directionKeywords.forEach(dir => {
