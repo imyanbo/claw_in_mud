@@ -2101,6 +2101,23 @@ function getCultivationRealm(player) {
   return '初窥';
 }
 
+function getRealmBreakthroughRequirement(player) {
+  const neigongLevel = getNeigongLevel(player);
+  if (neigongLevel < 12) return null;
+  if (neigongLevel < 20) return { realm: '小成', minExp: 120, minMastery: 12 };
+  if (neigongLevel < 28) return { realm: '大成', minExp: 300, minMastery: 20 };
+  if (neigongLevel < 36) return { realm: '圆满', minExp: 700, minMastery: 28 };
+  return { realm: '宗师', minExp: 1500, minMastery: 36 };
+}
+
+function canBreakthroughRealm(player) {
+  const req = getRealmBreakthroughRequirement(player);
+  if (!req) return { ok: true, req: null };
+  const primaryInnerSkill = getPrimaryInnerSkill(player);
+  const ok = player.exp >= req.minExp && primaryInnerSkill.level >= req.minMastery;
+  return { ok, req, primaryInnerSkill };
+}
+
 function getNeigongLevel(player) {
   const levels = Object.values(getInnerSkillLevels(player));
   return levels.length ? Math.max(...levels) : 1;
@@ -3404,6 +3421,22 @@ wss.on('connection', (ws, req) => {
           ws.send(formatOutput(player, player.room));
           break;
 
+        case 'breakthrough':
+        case '破境':
+          const breakthroughInfo = canBreakthroughRealm(player);
+          if (!breakthroughInfo.req) {
+            ws.send('你当前修为尚浅，还未到需要专门破境的时候。\n>');
+            break;
+          }
+          if (!breakthroughInfo.ok) {
+            ws.send(`你尝试冲击${breakthroughInfo.req.realm}境界，却觉火候未足。\n需求: 经验${breakthroughInfo.req.minExp}，主修内功${breakthroughInfo.req.minMastery}级\n当前: 经验${player.exp}，${breakthroughInfo.primaryInnerSkill.name}${breakthroughInfo.primaryInnerSkill.level}级\n>`);
+            break;
+          }
+          player.exp += Math.floor(breakthroughInfo.req.minExp * 0.08);
+          ws.send(`你凝神聚气，终于成功稳住${breakthroughInfo.req.realm}境界的门槛，体内真息更见圆融。\n【境界】当前已可稳固于${getCultivationRealm(player)}\n>`);
+          saveProgress();
+          break;
+
         case 'balance':
         case '平衡':
           normalizeCombatState(player);
@@ -3639,6 +3672,10 @@ wss.on('connection', (ws, req) => {
           const conflictPenalty = getNeigongConflictPenalty(player);
           skillMsg += `修炼境界: ${getCultivationRealm(player)}\n`;
           skillMsg += `主修内功: ${getPrimaryInnerSkill(player).name}\n`;
+          const breakthrough = canBreakthroughRealm(player);
+          if (breakthrough.req) {
+            skillMsg += `破境条件: ${breakthrough.req.realm} 需经验${breakthrough.req.minExp}、主修内功${breakthrough.req.minMastery}级 (${breakthrough.ok ? '已满足' : '未满足'})\n`;
+          }
           if (conflictPenalty.percent > 0) {
             skillMsg += `内功冲突: -${conflictPenalty.percent}% (${conflictPenalty.desc})\n\n`;
           } else {
@@ -4967,6 +5004,45 @@ wss.on('connection', (ws, req) => {
           ws.send(followMsg + '\n>');
           break;
 
+        case 'rebuild':
+        case '废功':
+          if (!args) {
+            ws.send('用法: 废功 [内功名]，例如 废功 九阴真经。\n>');
+            break;
+          }
+          if (!['九阳神功', '九阴真经', '北冥神功', '紫霞神功', '易筋经', '基本内功'].includes(args)) {
+            ws.send('只能废去内功类修为。\n>');
+            break;
+          }
+          if (!player.skills[args] || getSkillLevel(player, args) <= 0) {
+            ws.send(`你并未修成【${args}】，谈不上废功。\n>`);
+            break;
+          }
+          const lostLevel = getSkillLevel(player, args);
+          player.skills[args].level = 0;
+          player.skills[args].exp = 0;
+          player.skills[args].learnProgress = 0;
+          player.exp = Math.max(0, player.exp - lostLevel * 10);
+          recalculateDerivedStats(player);
+          saveProgress();
+          ws.send(`你狠下心自废【${args}】${lostLevel}级修为，只觉经脉空落，功力顿失一截。\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp}\n>`);
+          break;
+
+        case 'betray':
+        case '叛师':
+          if (!player.master) {
+            ws.send('你本就无师无门，谈不上叛师。\n>');
+            break;
+          }
+          const oldMaster = player.master;
+          const oldSchool = player.school;
+          player.master = null;
+          player.school = null;
+          player.exp = Math.max(0, player.exp - 50);
+          saveProgress();
+          ws.send(`你决意离开【${oldSchool}】，与师父【${oldMaster}】恩断义绝。江湖路远，从此只能另寻前程。\n>`);
+          break;
+
         case 'baishi':
         case '拜师':
           if (!args) {
@@ -5635,6 +5711,9 @@ train [气血|max] / dazuo [气血|max] - 打坐修炼(消耗HP，提升MP上限
 meditate / 打坐信息 - 查看当前打坐进度与上限
 retreat [分钟] / 闭关 [分钟] - 闭关修炼(1-10分钟)
 breakretreat / 出关 - 提前强行出关
+breakthrough / 破境 - 尝试突破当前境界门槛
+废功 [内功] - 自废某门内功修为
+叛师 - 退出当前师门
 shop - 查看商店
 buy [物品] - 购买
 inventory/i - 查看包裹
