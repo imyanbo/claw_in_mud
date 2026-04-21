@@ -2077,13 +2077,26 @@ function getWugongLevel(player) {
 
 function getMeditationBonusCap(player) {
   const baseInnerSkillLevel = getSkillLevel(player, '基本内功');
-  return Math.max(0, baseInnerSkillLevel * 18);
+  return Math.max(0, Math.floor(baseInnerSkillLevel * 12 + Math.pow(baseInnerSkillLevel, 1.12) * 2));
 }
 
 function getMeditationBonuses(player) {
   return {
     maxMpBonus: Math.max(0, Number(player.maxMpBonus || 0)),
     maxHpBonus: Math.max(0, Number(player.maxHpBonus || 0))
+  };
+}
+
+function getMeditationProgress(player) {
+  const cap = getMeditationBonusCap(player);
+  const bonuses = getMeditationBonuses(player);
+  const ratio = cap > 0 ? Math.min(1, bonuses.maxMpBonus / cap) : 0;
+  return {
+    cap,
+    maxMpBonus: bonuses.maxMpBonus,
+    maxHpBonus: bonuses.maxHpBonus,
+    ratio,
+    percent: Math.round(ratio * 100)
   };
 }
 
@@ -2598,6 +2611,10 @@ function formatOutput(player, message) {
   output += `HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli ?? 100}/${player.maxJingli ?? 100}\n`;
   output += `攻击:${player.外功攻击} 防御:${player.防御} 身法:${player.身法}\n`;
   output += `经验:${player.exp} 铜钱:${player.coin}\n`;
+  const meditationProgress = getMeditationProgress(player);
+  if (meditationProgress.cap > 0) {
+    output += `打坐: MP加成${meditationProgress.maxMpBonus}/${meditationProgress.cap} (${meditationProgress.percent}%) HP加成${meditationProgress.maxHpBonus}\n`;
+  }
   if (player.weapon || player.armor) {
     output += `装备: ${player.weapon || '无'}(攻+${weaponDmg}) ${player.armor || '无'}(防+${armorDef})\n`;
   }
@@ -3298,6 +3315,16 @@ wss.on('connection', (ws, req) => {
           }
           break;
 
+        case 'meditate':
+        case '打坐信息':
+          const meditationInfo = getMeditationProgress(player);
+          if (meditationInfo.cap <= 0) {
+            ws.send('你尚未练成基本内功，暂时还感知不到打坐积累。\n>');
+            break;
+          }
+          ws.send(`【打坐进境】\n基本内功限制的MP加成上限: ${meditationInfo.cap}\n当前MP上限加成: ${meditationInfo.maxMpBonus}\n当前HP上限加成: ${meditationInfo.maxHpBonus}\n当前进度: ${meditationInfo.percent}%\n提示: train [气血] 或 dazuo [气血] 可继续修炼。\n>`);
+          break;
+
         case 'train':
         case 'dazuo':
           const isTrainRoom = ['练功房', '华山练功房', '少林练功房'].includes(player.room);
@@ -3331,13 +3358,16 @@ wss.on('connection', (ws, req) => {
             const meditationCap = getMeditationBonusCap(player);
             const currentBonuses = getMeditationBonuses(player);
             const remainingMpBonusCapacity = Math.max(0, meditationCap - currentBonuses.maxMpBonus);
+            const progressRatio = meditationCap > 0 ? currentBonuses.maxMpBonus / meditationCap : 1;
+            const diminishingFactor = Math.max(0.2, 1 - progressRatio * 0.75);
+            const rawMpBonusGain = Math.floor((Math.sqrt(hpCost) * (1.6 + basicInnerSkillLevel * 0.08) + hpCost * 0.03) * diminishingFactor);
             const mpBonusGain = Math.min(
               remainingMpBonusCapacity,
-              Math.max(1, Math.floor(hpCost * (0.18 + basicInnerSkillLevel * 0.012)))
+              Math.max(1, rawMpBonusGain)
             );
-            const hpBonusGain = Math.floor(mpBonusGain * 0.6);
-            const expGain = Math.max(3, Math.floor(hpCost * 0.45) + Math.floor(basicInnerSkillLevel / 4));
-            const mpRecover = Math.max(1, Math.floor(hpCost * 0.35) + Math.floor(basicInnerSkillLevel * 0.5));
+            const hpBonusGain = Math.max(0, Math.floor(mpBonusGain * 0.45));
+            const expGain = Math.max(3, Math.floor(hpCost * 0.32) + Math.floor(basicInnerSkillLevel / 5));
+            const mpRecover = Math.max(1, Math.floor(hpCost * 0.22) + Math.floor(basicInnerSkillLevel * 0.35));
 
             player.hp = Math.max(0, player.hp - hpCost);
             player.maxMpBonus = currentBonuses.maxMpBonus + mpBonusGain;
@@ -5156,6 +5186,7 @@ status/状态 - 查看状态
 skills - 查看技能
 learn [技能] - 学习技能
 train [气血] / dazuo [气血] - 打坐修炼(消耗HP，提升MP上限并带动HP上限)
+meditate / 打坐信息 - 查看当前打坐进度与上限
 shop - 查看商店
 buy [物品] - 购买
 inventory/i - 查看包裹
