@@ -1152,6 +1152,9 @@ function createPlayer(name) {
     // 睡觉状态
     sleeping: false,
     sleepStartTime: 0,
+    // 打坐状态
+    meditating: false,
+    meditationEndTime: 0,
     // 闭关状态
     retreating: false,
     retreatStartTime: 0,
@@ -3037,6 +3040,20 @@ wss.on('connection', (ws, req) => {
       }
     }
 
+    // 检查玩家是否在打坐
+    if (player && player.meditating) {
+      const now = Date.now();
+      if (now >= Number(player.meditationEndTime || 0)) {
+        player.meditating = false;
+        player.meditationEndTime = 0;
+        ws.send('你缓缓睁开双眼，长长吐出一口浊气，起身而立。方才内息已沿周天运转一遍，丹田之中似乎又丰盈了几分。\n>');
+        saveProgress();
+        return;
+      }
+      ws.send('你正盘膝入定，真气尚在经脉间流转，暂时不能起身行动。\n>');
+      return;
+    }
+
     // 检查玩家是否在闭关
     if (player && player.retreating) {
       const now = Date.now();
@@ -3621,29 +3638,33 @@ wss.on('connection', (ws, req) => {
         case 'n':
         case 'north':
         case '北':
+          if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
           if (movePlayer(player, '北')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向北走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('北边没有路。可用: ' + exits); } break;
         case 's':
         case 'south':
         case '南':
+          if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
           if (movePlayer(player, '南')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向南走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('南边没有路。可用: ' + exits); } break;
         case 'e':
         case 'east':
         case '东':
+          if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
           if (movePlayer(player, '东')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向东走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('东边没有路。可用: ' + exits); } break;
         case 'w':
         case 'west':
         case '西':
+          if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
           if (movePlayer(player, '西')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向西走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('西边没有路。可用: ' + exits); } break;
         case 'u':
         case 'up':
-        case '上': player.following = null; if (movePlayer(player, '上')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向上走去')); } else ws.send('上面没有路。'); break;
+        case '上': if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; } player.following = null; if (movePlayer(player, '上')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向上走去')); } else ws.send('上面没有路。'); break;
         case 'd':
         case 'down':
-        case '下': player.following = null; if (movePlayer(player, '下')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向下走去')); } else ws.send('下面没有路。'); break;
+        case '下': if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; } player.following = null; if (movePlayer(player, '下')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向下走去')); } else ws.send('下面没有路。'); break;
 
         case 'eat':
         case '使用':
@@ -3965,9 +3986,11 @@ wss.on('connection', (ws, req) => {
               ? `\n⚠️【走火】${meditationEvent.message}`
               : '';
             player.lastMeditationAt = now;
+            player.meditating = true;
+            player.meditationEndTime = now + Math.max(4000, Math.floor(cooldownMs * 0.75));
 
             saveProgress();
-            ws.send(`${flavorMsg}${eventMsg}${conflictMsg}\n你盘膝打坐，搬运周天，以气血淬炼内息。\n气血-${actualHpCost}, MP+${actualMpGain}, MP上限+${actualMaxMpGain}, HP上限+${actualMaxHpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name} 境界:${getCultivationRealm(player)} 基本内功:${basicInnerSkillLevel}${capMsg}${titleMsg}\n>`);
+            ws.send(`${flavorMsg}${eventMsg}${conflictMsg}\n你盘膝打坐，搬运周天，以气血淬炼内息。此刻真气正在经脉间徐徐流转，未至功行圆满之前，你无法随意起身。\n气血-${actualHpCost}, MP+${actualMpGain}, MP上限+${actualMaxMpGain}, HP上限+${actualMaxHpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name} 境界:${getCultivationRealm(player)} 基本内功:${basicInnerSkillLevel}${capMsg}${titleMsg}\n>`);
           } else {
             let goMsg = '这里不是练功房，无法打坐修炼。\n';
             if (player.room === '客栈') goMsg += '提示: 客栈北边有练功房 (north)\n';
