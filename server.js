@@ -2062,15 +2062,48 @@ function getSkillLevel(player, skillName) {
   return Number(player.skills?.[skillName]?.level || 0);
 }
 
+function getInnerSkillLevels(player) {
+  return {
+    '基本内功': getSkillLevel(player, '基本内功'),
+    '九阳神功': getSkillLevel(player, '九阳神功'),
+    '九阴真经': getSkillLevel(player, '九阴真经'),
+    '北冥神功': getSkillLevel(player, '北冥神功'),
+    '紫霞神功': getSkillLevel(player, '紫霞神功'),
+    '易筋经': getSkillLevel(player, '易筋经')
+  };
+}
+
+function getNeigongConflictPenalty(player) {
+  const levels = getInnerSkillLevels(player);
+  const advanced = Object.entries(levels)
+    .filter(([name, level]) => name !== '基本内功' && level > 0)
+    .sort((a, b) => b[1] - a[1]);
+  if (advanced.length <= 1) {
+    return { percent: 0, desc: '内息纯一，运行圆融。' };
+  }
+  const topLevel = advanced[0][1];
+  const conflictingCount = advanced.filter(([, level]) => level >= Math.max(1, topLevel - 3)).length;
+  const percent = Math.min(28, (conflictingCount - 1) * 8 + Math.max(0, advanced.length - 2) * 4);
+  const names = advanced.map(([name]) => name).join('、');
+  return {
+    percent,
+    desc: `所修内功 ${names} 气机互有掣肘。`
+  };
+}
+
+function getCultivationRealm(player) {
+  const neigongLevel = getNeigongLevel(player);
+  if (neigongLevel >= 36) return '宗师';
+  if (neigongLevel >= 28) return '圆满';
+  if (neigongLevel >= 20) return '大成';
+  if (neigongLevel >= 12) return '小成';
+  if (neigongLevel >= 6) return '入门';
+  return '初窥';
+}
+
 function getNeigongLevel(player) {
-  return Math.max(
-    getSkillLevel(player, '基本内功'),
-    getSkillLevel(player, '九阳神功'),
-    getSkillLevel(player, '九阴真经'),
-    getSkillLevel(player, '北冥神功'),
-    getSkillLevel(player, '紫霞神功'),
-    getSkillLevel(player, '易筋经')
-  );
+  const levels = Object.values(getInnerSkillLevels(player));
+  return levels.length ? Math.max(...levels) : 1;
 }
 
 function getWugongLevel(player) {
@@ -2308,10 +2341,12 @@ function recalculateDerivedStats(player) {
   const meditationCap = getMeditationBonusCap(player);
   const meditationMpBonus = Math.min(Math.max(0, Number(player.maxMpBonus || 0)), meditationCap);
   const meditationHpBonus = Math.max(0, Number(player.maxHpBonus || Math.floor(meditationMpBonus * 0.6)));
+  const conflictPenalty = getNeigongConflictPenalty(player);
+  const conflictFactor = Math.max(0.65, 1 - conflictPenalty.percent / 100);
   player.maxMpBonus = meditationMpBonus;
   player.maxHpBonus = meditationHpBonus;
-  player.maxMp = 50 + baseAttr.经脉 * 5 + neigongLevel * 6 + baseInnerSkillLevel * 3 + meditationMpBonus;
-  player.maxHp = 100 + baseAttr.根骨 * 10 + neigongLevel * 3 + Math.floor(player.maxMp * 0.18) + meditationHpBonus;
+  player.maxMp = Math.floor((50 + baseAttr.经脉 * 5 + neigongLevel * 6 + baseInnerSkillLevel * 3 + meditationMpBonus) * conflictFactor);
+  player.maxHp = Math.floor((100 + baseAttr.根骨 * 10 + neigongLevel * 3 + Math.floor(player.maxMp * 0.18) + meditationHpBonus) * (0.82 + conflictFactor * 0.18));
   player.外功攻击 = 10 + baseAttr.根骨 * 2 + wugongLevel * 2;
   player.内功攻击 = Math.floor(neigongLevel * 1.2);
   player.防御 = 5 + Math.floor(baseAttr.根骨 / 2) + Math.floor(neigongLevel / 3);
@@ -2811,6 +2846,7 @@ function formatOutput(player, message) {
   output += `HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp}\n`;
   output += `攻击:${player.外功攻击} 防御:${player.防御} 身法:${player.身法}\n`;
   output += `经验:${player.exp} 铜钱:${player.coin}\n`;
+  output += `修炼境界:${getCultivationRealm(player)} 主修内功:${getPrimaryInnerSkill(player).name}\n`;
   if (player.weapon || player.armor) {
     output += `装备: ${player.weapon || '无'}(攻+${weaponDmg}) ${player.armor || '无'}(防+${armorDef})\n`;
   }
@@ -3600,6 +3636,14 @@ wss.on('connection', (ws, req) => {
             break;
           }
           let skillMsg = '\n【技能】\n';
+          const conflictPenalty = getNeigongConflictPenalty(player);
+          skillMsg += `修炼境界: ${getCultivationRealm(player)}\n`;
+          skillMsg += `主修内功: ${getPrimaryInnerSkill(player).name}\n`;
+          if (conflictPenalty.percent > 0) {
+            skillMsg += `内功冲突: -${conflictPenalty.percent}% (${conflictPenalty.desc})\n\n`;
+          } else {
+            skillMsg += `内功冲突: 无 (${conflictPenalty.desc})\n\n`;
+          }
           for (const [name, sk] of Object.entries(player.skills)) {
             const nextNeed = getSkillLearnNeed(Math.max(1, Number(sk.level || 0) + 1));
             const alias = skillEnglishNames[name] || '';
@@ -3754,6 +3798,12 @@ wss.on('connection', (ws, req) => {
               hpBonusGain += meditationEvent.bonusHp;
               expGain += meditationEvent.bonusExp;
             }
+            const conflictPenalty = getNeigongConflictPenalty(player);
+            if (conflictPenalty.percent > 0) {
+              mpBonusGain = Math.max(1, Math.floor(mpBonusGain * (1 - conflictPenalty.percent / 100)));
+              hpBonusGain = Math.max(1, Math.floor(hpBonusGain * (1 - conflictPenalty.percent / 120)));
+              expGain = Math.max(3, Math.floor(expGain * (1 - conflictPenalty.percent / 140)));
+            }
             player.maxMpBonus = currentBonuses.maxMpBonus + mpBonusGain;
             player.maxHpBonus = currentBonuses.maxHpBonus + hpBonusGain;
             player.exp += expGain;
@@ -3781,6 +3831,7 @@ wss.on('connection', (ws, req) => {
             const actualMaxHpGain = player.maxHp - oldMaxHp;
             const capReached = player.maxMpBonus >= meditationCap;
             const capMsg = capReached ? `\n【瓶颈】受基本内功${basicInnerSkillLevel}级所限，你的打坐收益已触及当前上限。` : `\n【进境】当前打坐上限 ${player.maxMpBonus}/${meditationCap}。`;
+            const conflictMsg = conflictPenalty.percent > 0 ? `\n⚖️【冲突】${conflictPenalty.desc} 当前修炼收益折损 ${conflictPenalty.percent}%。` : '';
             const titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
             const flavorMsg = getMeditationRoomFlavor(player.room, primaryInnerSkill.name);
             const eventMsg = meditationEvent?.type === 'insight'
@@ -3791,7 +3842,7 @@ wss.on('connection', (ws, req) => {
             player.lastMeditationAt = now;
 
             saveProgress();
-            ws.send(`${flavorMsg}${eventMsg}\n你盘膝打坐，搬运周天，以气血淬炼内息。\n气血-${actualHpCost}, MP+${actualMpGain}, MP上限+${actualMaxMpGain}, HP上限+${actualMaxHpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name} 基本内功:${basicInnerSkillLevel}${capMsg}${titleMsg}\n>`);
+            ws.send(`${flavorMsg}${eventMsg}${conflictMsg}\n你盘膝打坐，搬运周天，以气血淬炼内息。\n气血-${actualHpCost}, MP+${actualMpGain}, MP上限+${actualMaxMpGain}, HP上限+${actualMaxHpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name} 境界:${getCultivationRealm(player)} 基本内功:${basicInnerSkillLevel}${capMsg}${titleMsg}\n>`);
           } else {
             let goMsg = '这里不是练功房，无法打坐修炼。\n';
             if (player.room === '客栈') goMsg += '提示: 客栈北边有练功房 (north)\n';
