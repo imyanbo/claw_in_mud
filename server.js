@@ -1212,6 +1212,14 @@ function getLearnableSkillsForMaster(masterKey) {
   return [...new Set(list.filter(name => skillDb[name] || name === '学文识字'))];
 }
 
+function getManualLiteracyRequirement(itemName = '') {
+  if (itemName.includes('残卷')) return 4;
+  if (itemName.includes('羊皮卷')) return 6;
+  if (itemName.includes('壁画')) return 8;
+  if (itemName.includes('真经') || itemName.includes('秘籍')) return 10;
+  return 0;
+}
+
 function hasManualForSkill(player, skillName, roomName) {
   const manuals = skillBooks[skillName] || [];
   if (manuals.some(item => player.inventory.includes(item))) return true;
@@ -1270,6 +1278,15 @@ function canLearnSkill(player, skillName, source) {
     return '学习武功需要师父当面传授，或你手中有秘籍、书册、壁画、羊皮卷可供参悟。';
   }
   let needMaster = '';
+  if (source.type === 'manual') {
+    const manuals = skillBooks[skillName] || [];
+    const matchedManual = manuals.find(item => player.inventory.includes(item) || (getRoom(player.room)?.description || '').includes(item));
+    const literacyNeed = getManualLiteracyRequirement(matchedManual || '');
+    const literacyLevel = getSkillLevel(player, '学文识字');
+    if (literacyLevel < literacyNeed) {
+      return `你翻看${matchedManual || '这份秘籍'}，只觉字迹艰深难辨。至少需要学文识字 ${literacyNeed} 级，方能参悟其中关窍。`;
+    }
+  }
   if (["易筋经", "北冥神功"].includes(skillName) && (!player.master || !["方丈", "玄慈", "扫地僧", "xuanci", "fangzhang", "saodisen"].includes(player.master))) {
     needMaster = '少林寺';
   } else if (["紫霞神功", "孤独九剑"].includes(skillName) && (!player.master || !["岳不群", "风清扬", "yuebuqun", "fengqingyang"].includes(player.master))) {
@@ -2137,8 +2154,13 @@ function canBreakthroughRealm(player) {
   const req = getRealmBreakthroughRequirement(player);
   if (!req) return { ok: true, req: null };
   const primaryInnerSkill = getPrimaryInnerSkill(player);
-  const ok = player.exp >= req.minExp && primaryInnerSkill.level >= req.minMastery;
-  return { ok, req, primaryInnerSkill };
+  let requiredRoom = null;
+  if (req.realm === '小成') requiredRoom = '练功房';
+  if (req.realm === '大成') requiredRoom = player.school === '华山派' ? '思过崖' : player.school === '少林寺' ? '方丈室' : '练功房';
+  if (req.realm === '圆满') requiredRoom = player.school === '华山派' ? '华山练功房' : player.school === '少林寺' ? '少林练功房' : '思过崖';
+  if (req.realm === '宗师') requiredRoom = player.school === '少林寺' ? '藏经阁' : player.school === '华山派' ? '思过崖' : '方丈室';
+  const ok = player.exp >= req.minExp && primaryInnerSkill.level >= req.minMastery && (!requiredRoom || player.room === requiredRoom);
+  return { ok, req: { ...req, requiredRoom }, primaryInnerSkill };
 }
 
 function getNeigongLevel(player) {
@@ -3456,7 +3478,8 @@ wss.on('connection', (ws, req) => {
             break;
           }
           if (!breakthroughInfo.ok) {
-            ws.send(`你尝试冲击${breakthroughInfo.req.realm}境界，却觉火候未足。\n需求: 经验${breakthroughInfo.req.minExp}，主修内功${breakthroughInfo.req.minMastery}级\n当前: 经验${player.exp}，${breakthroughInfo.primaryInnerSkill.name}${breakthroughInfo.primaryInnerSkill.level}级\n>`);
+            const roomNeedMsg = breakthroughInfo.req.requiredRoom ? `，地点${breakthroughInfo.req.requiredRoom}` : '';
+            ws.send(`你尝试冲击${breakthroughInfo.req.realm}境界，却觉火候未足。\n需求: 经验${breakthroughInfo.req.minExp}，主修内功${breakthroughInfo.req.minMastery}级${roomNeedMsg}\n当前: 经验${player.exp}，${breakthroughInfo.primaryInnerSkill.name}${breakthroughInfo.primaryInnerSkill.level}级，所在${player.room}\n>`);
             break;
           }
           player.exp += Math.floor(breakthroughInfo.req.minExp * 0.08);
@@ -3702,7 +3725,9 @@ wss.on('connection', (ws, req) => {
           skillMsg += `学文识字: ${getSkillLevel(player, '学文识字')}级\n`;
           const breakthrough = canBreakthroughRealm(player);
           if (breakthrough.req) {
-            skillMsg += `破境条件: ${breakthrough.req.realm} 需经验${breakthrough.req.minExp}、主修内功${breakthrough.req.minMastery}级 (${breakthrough.ok ? '已满足' : '未满足'})\n`;
+            skillMsg += `破境条件: ${breakthrough.req.realm} 需经验${breakthrough.req.minExp}、主修内功${breakthrough.req.minMastery}级`;
+            if (breakthrough.req.requiredRoom) skillMsg += `、地点${breakthrough.req.requiredRoom}`;
+            skillMsg += ` (${breakthrough.ok ? '已满足' : '未满足'})\n`;
           }
           if (conflictPenalty.percent > 0) {
             skillMsg += `内功冲突: -${conflictPenalty.percent}% (${conflictPenalty.desc})\n\n`;
