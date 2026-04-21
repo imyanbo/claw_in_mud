@@ -2194,6 +2194,17 @@ function getMeditationCooldownMs(player) {
   return Math.max(8000, 18000 - basicInnerSkillLevel * 150);
 }
 
+function getCultivationSiteBonus(roomName) {
+  const siteBonuses = {
+    '思过崖': { exp: 1.2, mp: 1.15, hp: 1.05, desc: '思过崖孤绝清冷，最利参悟心关。' },
+    '方丈室': { exp: 1.1, mp: 1.08, hp: 1.18, desc: '方丈室禅意深深，闭关时更易稳固根基。' },
+    '少林练功房': { exp: 1.05, mp: 1.06, hp: 1.12, desc: '少林练功房气息沉稳，适合夯实气血。' },
+    '华山练功房': { exp: 1.08, mp: 1.12, hp: 1.04, desc: '华山练功房山风激荡，更助内息精进。' },
+    '练功房': { exp: 1, mp: 1, hp: 1, desc: '石室幽静，虽无奇遇，却也最适合踏实修炼。' }
+  };
+  return siteBonuses[roomName] || { exp: 1, mp: 1, hp: 1, desc: '此地只算寻常。' };
+}
+
 function rollRetreatEvent(player, retreatMinutes, innerSkillName) {
   const basicInnerSkillLevel = getSkillLevel(player, '基本内功');
   const insightChance = Math.min(0.22, 0.05 + retreatMinutes * 0.01 + basicInnerSkillLevel * 0.0015);
@@ -2862,10 +2873,12 @@ wss.on('connection', (ws, req) => {
         const retreatMinutes = Math.max(1, Math.round((player.retreatDurationMs || 60000) / 60000));
         const basicInnerSkillLevel = getSkillLevel(player, '基本内功');
         const primaryInnerSkill = getPrimaryInnerSkill(player);
+        const retreatRoomName = player.retreatRoom || player.room;
+        const siteBonus = getCultivationSiteBonus(retreatRoomName);
         const retreatEvent = rollRetreatEvent(player, retreatMinutes, primaryInnerSkill.name);
-        let expGain = Math.max(20, retreatMinutes * 18 + basicInnerSkillLevel * 3);
-        let mpBonusGain = Math.max(2, Math.floor(retreatMinutes * (1.2 + basicInnerSkillLevel * 0.08)));
-        let hpBonusGain = Math.max(1, Math.floor(mpBonusGain * 0.5));
+        let expGain = Math.max(20, Math.floor((retreatMinutes * 18 + basicInnerSkillLevel * 3) * siteBonus.exp));
+        let mpBonusGain = Math.max(2, Math.floor(retreatMinutes * (1.2 + basicInnerSkillLevel * 0.08) * siteBonus.mp));
+        let hpBonusGain = Math.max(1, Math.floor(mpBonusGain * 0.5 * siteBonus.hp));
         const skillExpGain = Math.max(10, retreatMinutes * 8);
         if (retreatEvent) {
           expGain = Math.max(8, Math.floor(expGain * retreatEvent.expFactor));
@@ -2874,7 +2887,6 @@ wss.on('connection', (ws, req) => {
         }
         const oldMaxMp = player.maxMp;
         const oldMaxHp = player.maxHp;
-        const retreatRoomName = player.retreatRoom || player.room;
         player.retreating = false;
         player.retreatStartTime = 0;
         player.retreatDurationMs = 0;
@@ -2907,7 +2919,7 @@ wss.on('connection', (ws, req) => {
           : retreatEvent?.type === 'backlash'
           ? `\n⚠️【走火】${retreatEvent.message}`
           : '';
-        ws.send(`你缓缓收功，结束了这一轮闭关。${eventMsg}\n【闭关成果】经验+${expGain}，MP上限+${actualMaxMpGain}，HP上限+${actualMaxHpGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name}\n>`);
+        ws.send(`你缓缓收功，结束了这一轮闭关。${eventMsg}\n【闭关宝地】${siteBonus.desc}\n【闭关成果】经验+${expGain}，MP上限+${actualMaxMpGain}，HP上限+${actualMaxHpGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name}\n>`);
         broadcastRetreatBreakthrough(player, retreatRoomName, retreatEvent?.type || 'normal');
         saveProgress();
         return;
@@ -3254,11 +3266,45 @@ wss.on('connection', (ws, req) => {
             ws.send('你气血未复，至少要在五成以上才适合闭关。\n>');
             break;
           }
+          const siteBonus = getCultivationSiteBonus(player.room);
           player.retreating = true;
           player.retreatStartTime = Date.now();
           player.retreatDurationMs = retreatArg * 60 * 1000;
           player.retreatRoom = player.room;
-          ws.send(`你寻了一处僻静角落，封息敛念，开始闭关 ${retreatArg} 分钟。\n闭关期间无法行动，时间一到将自动出关。\n>`);
+          ws.send(`你寻了一处僻静角落，封息敛念，开始闭关 ${retreatArg} 分钟。\n【闭关宝地】${siteBonus.desc}\n闭关期间无法行动，时间一到将自动出关。\n>`);
+          break;
+
+        case 'breakretreat':
+        case '出关':
+          if (!player.retreating) {
+            ws.send('你此刻并未闭关。\n>');
+            break;
+          }
+          const elapsed = Date.now() - Number(player.retreatStartTime || 0);
+          const total = Math.max(1, Number(player.retreatDurationMs || 0));
+          const progress = Math.max(0.1, Math.min(1, elapsed / total));
+          const primaryInnerSkill = getPrimaryInnerSkill(player);
+          const breakSiteBonus = getCultivationSiteBonus(player.retreatRoom || player.room);
+          const baseExp = Math.max(8, Math.floor((total / 60000) * 18 * progress * breakSiteBonus.exp));
+          const baseMpGain = Math.max(1, Math.floor((total / 60000) * 1.1 * progress * breakSiteBonus.mp));
+          const baseHpGain = Math.max(1, Math.floor(baseMpGain * 0.45 * breakSiteBonus.hp));
+          const oldMaxMp = player.maxMp;
+          const oldMaxHp = player.maxHp;
+          player.retreating = false;
+          player.retreatStartTime = 0;
+          player.retreatDurationMs = 0;
+          player.retreatRoom = null;
+          player.exp += baseExp;
+          player.maxMpBonus = Math.max(0, Number(player.maxMpBonus || 0)) + baseMpGain;
+          player.maxHpBonus = Math.max(0, Number(player.maxHpBonus || 0)) + baseHpGain;
+          recalculateDerivedStats(player);
+          player.hp = Math.max(1, Math.floor(player.maxHp * 0.55));
+          player.mp = Math.max(0, Math.floor(player.maxMp * 0.6));
+          const actualMaxMpGain = player.maxMp - oldMaxMp;
+          const actualMaxHpGain = player.maxHp - oldMaxHp;
+          ws.send(`你强行收束真气，提前破关而出。\n【代价】气息未稳，收益只有原闭关的一部分。\n【当前收获】经验+${baseExp}，MP上限+${actualMaxMpGain}，HP上限+${actualMaxHpGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name}\n>`);
+          broadcastRetreatBreakthrough(player, player.room, 'backlash');
+          saveProgress();
           break;
         
         case 'hp':
@@ -5482,6 +5528,7 @@ learn [技能] - 学习技能
 train [气血|max] / dazuo [气血|max] - 打坐修炼(消耗HP，提升MP上限并带动HP上限)
 meditate / 打坐信息 - 查看当前打坐进度与上限
 retreat [分钟] / 闭关 [分钟] - 闭关修炼(1-10分钟)
+breakretreat / 出关 - 提前强行出关
 shop - 查看商店
 buy [物品] - 购买
 inventory/i - 查看包裹
