@@ -2100,8 +2100,22 @@ function getMeditationProgress(player) {
   };
 }
 
-function getMeditationRoomFlavor(roomName) {
-  const flavors = {
+function getPrimaryInnerSkill(player) {
+  const innerSkills = ['九阳神功', '九阴真经', '北冥神功', '紫霞神功', '易筋经', '基本内功'];
+  let best = '基本内功';
+  let bestLevel = 0;
+  for (const skillName of innerSkills) {
+    const level = getSkillLevel(player, skillName);
+    if (level > bestLevel) {
+      best = skillName;
+      bestLevel = level;
+    }
+  }
+  return { name: best, level: bestLevel };
+}
+
+function getMeditationRoomFlavor(roomName, innerSkillName = '基本内功') {
+  const roomFlavors = {
     '练功房': [
       '石室寂静，只闻自己呼吸渐渐绵长。',
       '石壁微凉，你盘膝而坐，气息缓缓沉入丹田。',
@@ -2118,8 +2132,56 @@ function getMeditationRoomFlavor(roomName) {
       '四下空明，只有一缕禅意随周天运转而愈发清晰。'
     ]
   };
-  const pool = flavors[roomName] || ['你屏息凝神，缓缓运转周天。'];
-  return pool[Math.floor(Math.random() * pool.length)];
+  const skillFlavors = {
+    '紫霞神功': '一缕紫气自胸臆间浮沉往复，气机显得格外清灵。',
+    '易筋经': '筋骨在呼吸吐纳间微微震鸣，周身气血渐渐圆融。',
+    '北冥神功': '丹田深处仿佛生出一泓深潭，四散真气缓缓归流。',
+    '九阳神功': '体内暖意层层翻涌，经脉像被烈阳一点点照亮。',
+    '九阴真经': '一股清冷真息贴着经脉游走，杂火与躁意渐渐熄去。',
+    '基本内功': '你循着最朴实的吐纳法门，一点点稳住内息根基。'
+  };
+  const roomPool = roomFlavors[roomName] || ['你屏息凝神，缓缓运转周天。'];
+  return `${roomPool[Math.floor(Math.random() * roomPool.length)]}\n${skillFlavors[innerSkillName] || skillFlavors['基本内功']}`;
+}
+
+function rollMeditationEvent(player, hpCost, innerSkillName) {
+  const progress = getMeditationProgress(player);
+  const hpRatio = player.maxHp > 0 ? player.hp / player.maxHp : 1;
+  const basicInnerSkillLevel = getSkillLevel(player, '基本内功');
+  const insightChance = Math.min(0.18, 0.02 + basicInnerSkillLevel * 0.001 + hpCost * 0.00015);
+  const backlashChance = Math.min(0.2, Math.max(0, 0.06 - basicInnerSkillLevel * 0.0012 + (0.25 - hpRatio) * 0.12 + progress.ratio * 0.05));
+
+  if (Math.random() < backlashChance) {
+    const hpPenalty = Math.max(1, Math.floor(hpCost * 0.12));
+    const mpPenalty = Math.max(1, Math.floor((player.maxMp || 1) * 0.05));
+    return {
+      type: 'backlash',
+      hpPenalty,
+      mpPenalty,
+      message: innerSkillName === '北冥神功'
+        ? '你贪求吞纳过急，诸般杂气倒卷丹田，险些岔了真息。'
+        : '你一念稍乱，周天运转顿时失衡，真气在经脉间猛地一窒。'
+    };
+  }
+
+  if (Math.random() < insightChance) {
+    const bonusMp = Math.max(1, Math.floor(hpCost * 0.08 + basicInnerSkillLevel * 0.4));
+    const bonusHp = Math.max(0, Math.floor(bonusMp * 0.4));
+    const bonusExp = Math.max(3, Math.floor(hpCost * 0.12));
+    return {
+      type: 'insight',
+      bonusMp,
+      bonusHp,
+      bonusExp,
+      message: innerSkillName === '紫霞神功'
+        ? '你忽觉紫气东来，心神澄明，刹那间竟窥见一线更高明的运气法门。'
+        : innerSkillName === '易筋经'
+        ? '你只觉筋骨齐鸣，气血与真息融成一片，似乎悟到更深一层的门径。'
+        : '你福至心灵，周天运转竟比往日顺畅许多，隐隐有顿悟之感。'
+    };
+  }
+
+  return null;
 }
 
 function getMeditationCooldownMs(player) {
@@ -3397,21 +3459,58 @@ wss.on('connection', (ws, req) => {
             const oldMaxMp = player.maxMp;
             const oldMaxHp = player.maxHp;
             const oldTitle = player.title;
+            const primaryInnerSkill = getPrimaryInnerSkill(player);
             const meditationCap = getMeditationBonusCap(player);
             const currentBonuses = getMeditationBonuses(player);
             const remainingMpBonusCapacity = Math.max(0, meditationCap - currentBonuses.maxMpBonus);
             const progressRatio = meditationCap > 0 ? currentBonuses.maxMpBonus / meditationCap : 1;
+            let styleMultiplier = 1;
+            let hpToMpRecoverRate = 0.22;
+            let hpBonusRate = 0.45;
+            switch (primaryInnerSkill.name) {
+              case '北冥神功':
+                styleMultiplier = 1.12;
+                hpToMpRecoverRate = 0.28;
+                hpBonusRate = 0.38;
+                break;
+              case '易筋经':
+                styleMultiplier = 0.92;
+                hpToMpRecoverRate = 0.2;
+                hpBonusRate = 0.6;
+                break;
+              case '紫霞神功':
+                styleMultiplier = 1.05;
+                hpToMpRecoverRate = 0.24;
+                hpBonusRate = 0.42;
+                break;
+              case '九阳神功':
+                styleMultiplier = 1.18;
+                hpToMpRecoverRate = 0.3;
+                hpBonusRate = 0.48;
+                break;
+              case '九阴真经':
+                styleMultiplier = 1.02;
+                hpToMpRecoverRate = 0.22;
+                hpBonusRate = 0.52;
+                break;
+            }
             const diminishingFactor = Math.max(0.2, 1 - progressRatio * 0.75);
-            const rawMpBonusGain = Math.floor((Math.sqrt(hpCost) * (1.6 + basicInnerSkillLevel * 0.08) + hpCost * 0.03) * diminishingFactor);
-            const mpBonusGain = Math.min(
+            const rawMpBonusGain = Math.floor((Math.sqrt(hpCost) * (1.6 + basicInnerSkillLevel * 0.08) + hpCost * 0.03) * diminishingFactor * styleMultiplier);
+            let mpBonusGain = Math.min(
               remainingMpBonusCapacity,
               Math.max(1, rawMpBonusGain)
             );
-            const hpBonusGain = Math.max(0, Math.floor(mpBonusGain * 0.45));
-            const expGain = Math.max(3, Math.floor(hpCost * 0.32) + Math.floor(basicInnerSkillLevel / 5));
-            const mpRecover = Math.max(1, Math.floor(hpCost * 0.22) + Math.floor(basicInnerSkillLevel * 0.35));
+            let hpBonusGain = Math.max(0, Math.floor(mpBonusGain * hpBonusRate));
+            let expGain = Math.max(3, Math.floor(hpCost * 0.32) + Math.floor(basicInnerSkillLevel / 5));
+            let mpRecover = Math.max(1, Math.floor(hpCost * hpToMpRecoverRate) + Math.floor(basicInnerSkillLevel * 0.35));
 
             player.hp = Math.max(0, player.hp - hpCost);
+            const meditationEvent = rollMeditationEvent(player, hpCost, primaryInnerSkill.name);
+            if (meditationEvent?.type === 'insight') {
+              mpBonusGain = Math.min(remainingMpBonusCapacity, mpBonusGain + meditationEvent.bonusMp);
+              hpBonusGain += meditationEvent.bonusHp;
+              expGain += meditationEvent.bonusExp;
+            }
             player.maxMpBonus = currentBonuses.maxMpBonus + mpBonusGain;
             player.maxHpBonus = currentBonuses.maxHpBonus + hpBonusGain;
             player.exp += expGain;
@@ -3427,6 +3526,10 @@ wss.on('connection', (ws, req) => {
 
             recalculateDerivedStats(player);
             player.mp = Math.min(player.maxMp, oldMp + mpRecover + Math.floor(mpBonusGain * 0.5));
+            if (meditationEvent?.type === 'backlash') {
+              player.hp = Math.max(1, player.hp - meditationEvent.hpPenalty);
+              player.mp = Math.max(0, player.mp - meditationEvent.mpPenalty);
+            }
             player.title = getTitle(player.exp);
 
             const actualHpCost = oldHp - player.hp;
@@ -3436,11 +3539,16 @@ wss.on('connection', (ws, req) => {
             const capReached = player.maxMpBonus >= meditationCap;
             const capMsg = capReached ? `\n【瓶颈】受基本内功${basicInnerSkillLevel}级所限，你的打坐收益已触及当前上限。` : `\n【进境】当前打坐上限 ${player.maxMpBonus}/${meditationCap}。`;
             const titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
-            const flavorMsg = getMeditationRoomFlavor(player.room);
+            const flavorMsg = getMeditationRoomFlavor(player.room, primaryInnerSkill.name);
+            const eventMsg = meditationEvent?.type === 'insight'
+              ? `\n✨【顿悟】${meditationEvent.message}`
+              : meditationEvent?.type === 'backlash'
+              ? `\n⚠️【走火】${meditationEvent.message}`
+              : '';
             player.lastMeditationAt = now;
 
             saveProgress();
-            ws.send(`${flavorMsg}\n你盘膝打坐，搬运周天，以气血淬炼内息。\n气血-${actualHpCost}, MP+${actualMpGain}, MP上限+${actualMaxMpGain}, HP上限+${actualMaxHpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 基本内功:${basicInnerSkillLevel}${capMsg}${titleMsg}\n>`);
+            ws.send(`${flavorMsg}${eventMsg}\n你盘膝打坐，搬运周天，以气血淬炼内息。\n气血-${actualHpCost}, MP+${actualMpGain}, MP上限+${actualMaxMpGain}, HP上限+${actualMaxHpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name} 基本内功:${basicInnerSkillLevel}${capMsg}${titleMsg}\n>`);
           } else {
             let goMsg = '这里不是练功房，无法打坐修炼。\n';
             if (player.room === '客栈') goMsg += '提示: 客栈北边有练功房 (north)\n';
