@@ -213,7 +213,8 @@ const skillDb = {
   '白云城主': { type: '被动', damage: 0, desc: '叶孤城的独门轻功' },
   '紫禁之巅': { type: '主动', damage: 55, desc: '江湖最负盛名的决战剑招' },
   '凤凰步': { type: '被动', damage: 0, desc: '陆小凤的绝顶轻功' },
-  '无形剑': { type: '主动', damage: 45, desc: '青衣楼杀手的隐秘剑术' }
+  '无形剑': { type: '主动', damage: 45, desc: '青衣楼杀手的隐秘剑术' },
+  '学文识字': { type: '被动', damage: 0, desc: '提升识读典籍、精神力与悟性发挥' }
 };
 
 // 技能别名映射
@@ -225,7 +226,8 @@ const skillAliases = {
   "luoyingshen掌": "落英神掌", "luoying": "落英神掌", "tanzhi": "弹指神通",
   "yuxiao": "玉箫剑法", "bihai": "碧海潮生曲", "wuxing": "五行八卦掌",
   "jibenneigong": "基本内功", "jibenquanfa": "基本拳法", "jibenqinggong": "基本轻功",
-  "lingxizhi": "灵犀指", "tianwaifeixian": "天外飞仙", "danzhishentong": "弹指神通", "yuxiaojianfa": "玉箫剑法"
+  "lingxizhi": "灵犀指", "tianwaifeixian": "天外飞仙", "danzhishentong": "弹指神通", "yuxiaojianfa": "玉箫剑法",
+  "literacy": "学文识字"
 };
 
 const skillEnglishNames = {
@@ -4319,7 +4321,11 @@ wss.on('connection', (ws, req) => {
             ws.send(`你展开【${readableItem}】，只觉字迹艰深古拙，难以尽识。\n需求: 学文识字 ${literacyNeed} 级\n当前: ${literacyLevel} 级\n>`);
             break;
           }
-          ws.send(`你静下心来细读【${readableItem}】。\n纸上字句渐渐分明，你对其中隐含的武学义理多了几分把握。\n【识读】学文识字 ${literacyLevel} 级，可顺利参悟此物。\n>`);
+          let readFlavor = '纸上字句渐渐分明，你对其中隐含的武学义理多了几分把握。';
+          if (readableItem.includes('残卷')) readFlavor = '残卷缺页断行，你只能从只言片语中勉强拼出些许线索。';
+          else if (readableItem.includes('壁画')) readFlavor = '壁上纹理与图形交错，你一边辨字，一边揣摩其中藏着的招意。';
+          else if (readableItem.includes('真经') || readableItem.includes('秘籍')) readFlavor = '经页上的字句层层递进，你越读越觉其中别有洞天。';
+          ws.send(`你静下心来细读【${readableItem}】。\n${readFlavor}\n【识读】学文识字 ${literacyLevel} 级，可顺利参悟此物。\n>`);
           break;
 
         case 'i':
