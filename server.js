@@ -2194,15 +2194,56 @@ function getMeditationCooldownMs(player) {
   return Math.max(8000, 18000 - basicInnerSkillLevel * 150);
 }
 
-function getCultivationSiteBonus(roomName) {
+function getCultivationSiteBonus(roomName, innerSkillName = '基本内功') {
   const siteBonuses = {
-    '思过崖': { exp: 1.2, mp: 1.15, hp: 1.05, desc: '思过崖孤绝清冷，最利参悟心关。' },
-    '方丈室': { exp: 1.1, mp: 1.08, hp: 1.18, desc: '方丈室禅意深深，闭关时更易稳固根基。' },
-    '少林练功房': { exp: 1.05, mp: 1.06, hp: 1.12, desc: '少林练功房气息沉稳，适合夯实气血。' },
-    '华山练功房': { exp: 1.08, mp: 1.12, hp: 1.04, desc: '华山练功房山风激荡，更助内息精进。' },
-    '练功房': { exp: 1, mp: 1, hp: 1, desc: '石室幽静，虽无奇遇，却也最适合踏实修炼。' }
+    '思过崖': { exp: 1.2, mp: 1.15, hp: 1.05, desc: '思过崖孤绝清冷，最利参悟心关。', school: '华山派', favored: ['紫霞神功', '九阴真经'] },
+    '方丈室': { exp: 1.1, mp: 1.08, hp: 1.18, desc: '方丈室禅意深深，闭关时更易稳固根基。', school: '少林寺', favored: ['易筋经'] },
+    '少林练功房': { exp: 1.05, mp: 1.06, hp: 1.12, desc: '少林练功房气息沉稳，适合夯实气血。', school: '少林寺', favored: ['易筋经', '基本内功'] },
+    '华山练功房': { exp: 1.08, mp: 1.12, hp: 1.04, desc: '华山练功房山风激荡，更助内息精进。', school: '华山派', favored: ['紫霞神功'] },
+    '练功房': { exp: 1, mp: 1, hp: 1, desc: '石室幽静，虽无奇遇，却也最适合踏实修炼。', school: null, favored: ['基本内功'] }
   };
-  return siteBonuses[roomName] || { exp: 1, mp: 1, hp: 1, desc: '此地只算寻常。' };
+  const base = siteBonuses[roomName] || { exp: 1, mp: 1, hp: 1, desc: '此地只算寻常。', school: null, favored: [] };
+  const bonus = { ...base, resonance: false };
+  if (base.favored.includes(innerSkillName)) {
+    bonus.exp = Number((bonus.exp * 1.08).toFixed(3));
+    bonus.mp = Number((bonus.mp * 1.12).toFixed(3));
+    bonus.hp = Number((bonus.hp * 1.08).toFixed(3));
+    bonus.resonance = true;
+    bonus.desc += ` 此地与你所修的${innerSkillName}隐隐共鸣。`;
+  }
+  return bonus;
+}
+
+function rollRetreatInterruption(player, roomName, innerSkillName) {
+  const chance = roomName === '思过崖' || roomName === '方丈室' ? 0.08 : 0.05;
+  if (Math.random() > chance) return null;
+  if (roomName === '思过崖') {
+    return {
+      type: 'encounter',
+      expFactor: 1.18,
+      mpFactor: 1.12,
+      hpFactor: 1,
+      message: '山风穿崖而过，你恍惚间似见前人剑痕未散，竟从中悟出几分新意。'
+    };
+  }
+  if (roomName === '方丈室') {
+    return {
+      type: 'guidance',
+      expFactor: 1.1,
+      mpFactor: 1,
+      hpFactor: 1.2,
+      message: '檀香袅袅间，你仿佛听见一声低沉佛号，心神顿时安定下来。'
+    };
+  }
+  return {
+    type: 'disturb',
+    expFactor: 0.88,
+    mpFactor: 0.9,
+    hpFactor: 0.92,
+    message: innerSkillName === '北冥神功'
+      ? '你正欲沉入更深层的吐纳，外界杂音忽入耳中，丹田回流顿时散了几分。'
+      : '你闭关正紧，忽被外间细碎声响扰动，气机微微一乱。'
+  };
 }
 
 function rollRetreatEvent(player, retreatMinutes, innerSkillName) {
@@ -2874,8 +2915,9 @@ wss.on('connection', (ws, req) => {
         const basicInnerSkillLevel = getSkillLevel(player, '基本内功');
         const primaryInnerSkill = getPrimaryInnerSkill(player);
         const retreatRoomName = player.retreatRoom || player.room;
-        const siteBonus = getCultivationSiteBonus(retreatRoomName);
+        const siteBonus = getCultivationSiteBonus(retreatRoomName, primaryInnerSkill.name);
         const retreatEvent = rollRetreatEvent(player, retreatMinutes, primaryInnerSkill.name);
+        const retreatInterrupt = rollRetreatInterruption(player, retreatRoomName, primaryInnerSkill.name);
         let expGain = Math.max(20, Math.floor((retreatMinutes * 18 + basicInnerSkillLevel * 3) * siteBonus.exp));
         let mpBonusGain = Math.max(2, Math.floor(retreatMinutes * (1.2 + basicInnerSkillLevel * 0.08) * siteBonus.mp));
         let hpBonusGain = Math.max(1, Math.floor(mpBonusGain * 0.5 * siteBonus.hp));
@@ -2884,6 +2926,11 @@ wss.on('connection', (ws, req) => {
           expGain = Math.max(8, Math.floor(expGain * retreatEvent.expFactor));
           mpBonusGain = Math.max(1, Math.floor(mpBonusGain * retreatEvent.mpBonusFactor));
           hpBonusGain = Math.max(1, Math.floor(hpBonusGain * retreatEvent.hpBonusFactor));
+        }
+        if (retreatInterrupt) {
+          expGain = Math.max(6, Math.floor(expGain * retreatInterrupt.expFactor));
+          mpBonusGain = Math.max(1, Math.floor(mpBonusGain * retreatInterrupt.mpFactor));
+          hpBonusGain = Math.max(1, Math.floor(hpBonusGain * retreatInterrupt.hpFactor));
         }
         const oldMaxMp = player.maxMp;
         const oldMaxHp = player.maxHp;
@@ -2919,8 +2966,16 @@ wss.on('connection', (ws, req) => {
           : retreatEvent?.type === 'backlash'
           ? `\n⚠️【走火】${retreatEvent.message}`
           : '';
-        ws.send(`你缓缓收功，结束了这一轮闭关。${eventMsg}\n【闭关宝地】${siteBonus.desc}\n【闭关成果】经验+${expGain}，MP上限+${actualMaxMpGain}，HP上限+${actualMaxHpGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name}\n>`);
-        broadcastRetreatBreakthrough(player, retreatRoomName, retreatEvent?.type || 'normal');
+        const interruptMsg = retreatInterrupt?.type === 'encounter'
+          ? `\n🌫️【奇遇】${retreatInterrupt.message}`
+          : retreatInterrupt?.type === 'guidance'
+          ? `\n🪔【点化】${retreatInterrupt.message}`
+          : retreatInterrupt?.type === 'disturb'
+          ? `\n🍃【扰动】${retreatInterrupt.message}`
+          : '';
+        const resonanceMsg = siteBonus.resonance ? `\n🔔【共鸣】${primaryInnerSkill.name}与此地气机互相激荡，你的闭关收获更胜平日。` : '';
+        ws.send(`你缓缓收功，结束了这一轮闭关。${eventMsg}${interruptMsg}${resonanceMsg}\n【闭关宝地】${siteBonus.desc}\n【闭关成果】经验+${expGain}，MP上限+${actualMaxMpGain}，HP上限+${actualMaxHpGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name}\n>`);
+        broadcastRetreatBreakthrough(player, retreatRoomName, retreatEvent?.type || retreatInterrupt?.type || 'normal');
         saveProgress();
         return;
       } else {
