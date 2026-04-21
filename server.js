@@ -2075,13 +2075,30 @@ function getWugongLevel(player) {
   return offensiveLevels.length ? Math.max(...offensiveLevels) : 1;
 }
 
+function getMeditationBonusCap(player) {
+  const baseInnerSkillLevel = getSkillLevel(player, '基本内功');
+  return Math.max(0, baseInnerSkillLevel * 18);
+}
+
+function getMeditationBonuses(player) {
+  return {
+    maxMpBonus: Math.max(0, Number(player.maxMpBonus || 0)),
+    maxHpBonus: Math.max(0, Number(player.maxHpBonus || 0))
+  };
+}
+
 function recalculateDerivedStats(player) {
   const baseAttr = player.先天 || { 根骨: 5, 悟性: 5, 经脉: 5, 福缘: 5 };
   const neigongLevel = getNeigongLevel(player);
   const wugongLevel = getWugongLevel(player);
   const baseInnerSkillLevel = getSkillLevel(player, '基本内功');
-  player.maxMp = 50 + baseAttr.经脉 * 5 + neigongLevel * 6 + baseInnerSkillLevel * 3;
-  player.maxHp = 100 + baseAttr.根骨 * 10 + neigongLevel * 3 + Math.floor(player.maxMp * 0.18);
+  const meditationCap = getMeditationBonusCap(player);
+  const meditationMpBonus = Math.min(Math.max(0, Number(player.maxMpBonus || 0)), meditationCap);
+  const meditationHpBonus = Math.max(0, Number(player.maxHpBonus || Math.floor(meditationMpBonus * 0.6)));
+  player.maxMpBonus = meditationMpBonus;
+  player.maxHpBonus = meditationHpBonus;
+  player.maxMp = 50 + baseAttr.经脉 * 5 + neigongLevel * 6 + baseInnerSkillLevel * 3 + meditationMpBonus;
+  player.maxHp = 100 + baseAttr.根骨 * 10 + neigongLevel * 3 + Math.floor(player.maxMp * 0.18) + meditationHpBonus;
   player.外功攻击 = 10 + baseAttr.根骨 * 2 + wugongLevel * 2;
   player.内功攻击 = Math.floor(neigongLevel * 1.2);
   player.防御 = 5 + Math.floor(baseAttr.根骨 / 2) + Math.floor(neigongLevel / 3);
@@ -3282,42 +3299,76 @@ wss.on('connection', (ws, req) => {
           break;
 
         case 'train':
+        case 'dazuo':
           const isTrainRoom = ['练功房', '华山练功房', '少林练功房'].includes(player.room);
           if (isTrainRoom) {
-            const expGain = 10 + Math.floor(Math.random() * 5);
-            const hpGain = 10;
-            const mpGain = 20;
+            const hpCostRaw = Number(parts[1]);
+            if (!Number.isInteger(hpCostRaw) || hpCostRaw <= 0) {
+              ws.send('用法: train [消耗气血]，例如 train 50。dazuo 与 train 同义。\n>');
+              break;
+            }
+            if (player.hp < Math.ceil(player.maxHp * 0.1)) {
+              ws.send('你气血已不足一成，强行打坐恐走火入魔，无法继续修炼。\n>');
+              break;
+            }
+            const safeHpFloor = Math.ceil(player.maxHp * 0.1);
+            const maxSpendableHp = Math.max(0, player.hp - safeHpFloor);
+            if (maxSpendableHp <= 0) {
+              ws.send('你现在的气血太低，至少要保留一成气血才能打坐。\n>');
+              break;
+            }
+            const hpCost = Math.min(hpCostRaw, maxSpendableHp);
+            const basicInnerSkillLevel = getSkillLevel(player, '基本内功');
+            if (basicInnerSkillLevel <= 0) {
+              ws.send('你尚未掌握基本内功，贸然打坐只会徒耗气血。\n>');
+              break;
+            }
             const oldHp = player.hp;
             const oldMp = player.mp;
-            player.hp = Math.min(player.maxHp, player.hp + hpGain);
-            player.mp = Math.min(player.maxMp, player.mp + mpGain);
+            const oldMaxMp = player.maxMp;
+            const oldMaxHp = player.maxHp;
+            const oldTitle = player.title;
+            const meditationCap = getMeditationBonusCap(player);
+            const currentBonuses = getMeditationBonuses(player);
+            const remainingMpBonusCapacity = Math.max(0, meditationCap - currentBonuses.maxMpBonus);
+            const mpBonusGain = Math.min(
+              remainingMpBonusCapacity,
+              Math.max(1, Math.floor(hpCost * (0.18 + basicInnerSkillLevel * 0.012)))
+            );
+            const hpBonusGain = Math.floor(mpBonusGain * 0.6);
+            const expGain = Math.max(3, Math.floor(hpCost * 0.45) + Math.floor(basicInnerSkillLevel / 4));
+            const mpRecover = Math.max(1, Math.floor(hpCost * 0.35) + Math.floor(basicInnerSkillLevel * 0.5));
+
+            player.hp = Math.max(0, player.hp - hpCost);
+            player.maxMpBonus = currentBonuses.maxMpBonus + mpBonusGain;
+            player.maxHpBonus = currentBonuses.maxHpBonus + hpBonusGain;
             player.exp += expGain;
+
             const neigongSkill = ['基本内功', '紫霞神功', '易筋经', '北冥神功', '九阳神功', '九阴真经'].find(name => player.skills[name]);
-            const wugongSkill = Object.keys(player.skills).find(name => skillDb[name]?.type === '主动') || '基本拳法';
             if (neigongSkill) {
-              player.skills[neigongSkill].exp = (player.skills[neigongSkill].exp || 0) + 10;
+              player.skills[neigongSkill].exp = (player.skills[neigongSkill].exp || 0) + Math.max(6, Math.floor(hpCost * 0.22));
               if (player.skills[neigongSkill].exp >= player.skills[neigongSkill].level * 28) {
                 player.skills[neigongSkill].exp = 0;
                 player.skills[neigongSkill].level += 1;
               }
             }
-            if (wugongSkill && player.skills[wugongSkill]) {
-              player.skills[wugongSkill].exp = (player.skills[wugongSkill].exp || 0) + 7;
-              if (player.skills[wugongSkill].exp >= player.skills[wugongSkill].level * 26) {
-                player.skills[wugongSkill].exp = 0;
-                player.skills[wugongSkill].level += 1;
-              }
-            }
+
             recalculateDerivedStats(player);
-            const oldTitle = player.title;
+            player.mp = Math.min(player.maxMp, oldMp + mpRecover + Math.floor(mpBonusGain * 0.5));
             player.title = getTitle(player.exp);
-            const actualHpGain = player.hp - oldHp;
+
+            const actualHpCost = oldHp - player.hp;
             const actualMpGain = player.mp - oldMp;
-            let titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
+            const actualMaxMpGain = player.maxMp - oldMaxMp;
+            const actualMaxHpGain = player.maxHp - oldMaxHp;
+            const capReached = player.maxMpBonus >= meditationCap;
+            const capMsg = capReached ? `\n【瓶颈】受基本内功${basicInnerSkillLevel}级所限，你的打坐收益已触及当前上限。` : `\n【进境】当前打坐上限 ${player.maxMpBonus}/${meditationCap}。`;
+            const titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
+
             saveProgress();
-            ws.send(`你在练功房打坐片刻，感觉内力与武学都更进了一层！\nHP+${actualHpGain}, MP+${actualMpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 武功:${getWugongLevel(player)} 内功:${getNeigongLevel(player)}\n【平衡参考】外攻:${player.外功攻击} 内攻:${player.内功攻击} 防御:${player.防御}${titleMsg}\n>`);
+            ws.send(`你盘膝打坐，搬运周天，以气血淬炼内息。\n气血-${actualHpCost}, MP+${actualMpGain}, MP上限+${actualMaxMpGain}, HP上限+${actualMaxHpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 基本内功:${basicInnerSkillLevel}${capMsg}${titleMsg}\n>`);
           } else {
-            let goMsg = '这里不是练功房，无法修炼。\n';
+            let goMsg = '这里不是练功房，无法打坐修炼。\n';
             if (player.room === '客栈') goMsg += '提示: 客栈北边有练功房 (north)\n';
             else if (player.room === '华山派大厅') goMsg += '提示: 华山派大厅北边有华山练功房\n';
             else if (player.room === '少林寺大院') goMsg += '提示: 少林寺大院东边有罗汉堂，罗汉堂北边有少林练功房\n';
@@ -5104,7 +5155,7 @@ u/d - 上/下楼梯
 status/状态 - 查看状态
 skills - 查看技能
 learn [技能] - 学习技能
-train - 练功(恢复HP/MP)
+train [气血] / dazuo [气血] - 打坐修炼(消耗HP，提升MP上限并带动HP上限)
 shop - 查看商店
 buy [物品] - 购买
 inventory/i - 查看包裹
