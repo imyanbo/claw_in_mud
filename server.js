@@ -2191,7 +2191,61 @@ function rollMeditationEvent(player, hpCost, innerSkillName) {
 
 function getMeditationCooldownMs(player) {
   const basicInnerSkillLevel = getSkillLevel(player, '基本内功');
-  return Math.max(4000, 12000 - basicInnerSkillLevel * 120);
+  return Math.max(8000, 18000 - basicInnerSkillLevel * 150);
+}
+
+function rollRetreatEvent(player, retreatMinutes, innerSkillName) {
+  const basicInnerSkillLevel = getSkillLevel(player, '基本内功');
+  const insightChance = Math.min(0.22, 0.05 + retreatMinutes * 0.01 + basicInnerSkillLevel * 0.0015);
+  const bottleneckChance = Math.min(0.18, 0.04 + retreatMinutes * 0.008);
+  const backlashChance = Math.max(0.02, 0.08 - basicInnerSkillLevel * 0.001);
+
+  const roll = Math.random();
+  if (roll < backlashChance) {
+    return {
+      type: 'backlash',
+      expFactor: 0.7,
+      mpBonusFactor: 0.65,
+      hpBonusFactor: 0.7,
+      message: innerSkillName === '九阳神功'
+        ? '你强催真火过甚，胸中热浪翻腾，险些逆冲心脉。'
+        : '你闭关时心神一乱，真息逆行，经脉隐隐作痛。'
+    };
+  }
+  if (roll < backlashChance + bottleneckChance) {
+    return {
+      type: 'bottleneck',
+      expFactor: 0.85,
+      mpBonusFactor: 0.8,
+      hpBonusFactor: 0.8,
+      message: '你隐约触到一层关隘，虽未尽破，却也摸清了前路所在。'
+    };
+  }
+  if (roll > 1 - insightChance) {
+    return {
+      type: 'insight',
+      expFactor: 1.35,
+      mpBonusFactor: 1.4,
+      hpBonusFactor: 1.25,
+      message: innerSkillName === '易筋经'
+        ? '你在寂然中忽觉周身关节尽开，筋骨皮膜俱有新悟。'
+        : '你灵台一明，似有一道灵光贯通上下，所悟远胜平日。'
+    };
+  }
+  return null;
+}
+
+function broadcastRetreatBreakthrough(player, roomName, eventType) {
+  const roomPlayers = Object.values(players).filter(p => p.room === roomName && p.name !== player.name);
+  if (!roomPlayers.length) return;
+  const msg = eventType === 'insight'
+    ? `【江湖】${player.name}闭关而出，眸中精光隐现，似是大有所得。\n>`
+    : eventType === 'backlash'
+    ? `【江湖】${player.name}闭关出关时脚步微乱，气息似有些浮动。\n>`
+    : `【江湖】${player.name}闭关已毕，神色沉静，似又精进一步。\n>`;
+  for (const other of roomPlayers) {
+    if (onlinePlayers[other.name]) onlinePlayers[other.name].send(msg);
+  }
 }
 
 function recalculateDerivedStats(player) {
@@ -2808,12 +2862,19 @@ wss.on('connection', (ws, req) => {
         const retreatMinutes = Math.max(1, Math.round((player.retreatDurationMs || 60000) / 60000));
         const basicInnerSkillLevel = getSkillLevel(player, '基本内功');
         const primaryInnerSkill = getPrimaryInnerSkill(player);
-        const expGain = Math.max(20, retreatMinutes * 18 + basicInnerSkillLevel * 3);
-        const mpBonusGain = Math.max(2, Math.floor(retreatMinutes * (1.2 + basicInnerSkillLevel * 0.08)));
-        const hpBonusGain = Math.max(1, Math.floor(mpBonusGain * 0.5));
+        const retreatEvent = rollRetreatEvent(player, retreatMinutes, primaryInnerSkill.name);
+        let expGain = Math.max(20, retreatMinutes * 18 + basicInnerSkillLevel * 3);
+        let mpBonusGain = Math.max(2, Math.floor(retreatMinutes * (1.2 + basicInnerSkillLevel * 0.08)));
+        let hpBonusGain = Math.max(1, Math.floor(mpBonusGain * 0.5));
         const skillExpGain = Math.max(10, retreatMinutes * 8);
+        if (retreatEvent) {
+          expGain = Math.max(8, Math.floor(expGain * retreatEvent.expFactor));
+          mpBonusGain = Math.max(1, Math.floor(mpBonusGain * retreatEvent.mpBonusFactor));
+          hpBonusGain = Math.max(1, Math.floor(hpBonusGain * retreatEvent.hpBonusFactor));
+        }
         const oldMaxMp = player.maxMp;
         const oldMaxHp = player.maxHp;
+        const retreatRoomName = player.retreatRoom || player.room;
         player.retreating = false;
         player.retreatStartTime = 0;
         player.retreatDurationMs = 0;
@@ -2829,12 +2890,25 @@ wss.on('connection', (ws, req) => {
           }
         }
         recalculateDerivedStats(player);
-        player.hp = Math.min(player.maxHp, Math.max(player.hp, Math.floor(player.maxHp * 0.7)));
-        player.mp = player.maxMp;
+        if (retreatEvent?.type === 'backlash') {
+          player.hp = Math.max(1, Math.floor(player.maxHp * 0.45));
+          player.mp = Math.max(0, Math.floor(player.maxMp * 0.35));
+        } else {
+          player.hp = Math.min(player.maxHp, Math.max(player.hp, Math.floor(player.maxHp * 0.7)));
+          player.mp = player.maxMp;
+        }
         player.title = getTitle(player.exp);
         const actualMaxMpGain = player.maxMp - oldMaxMp;
         const actualMaxHpGain = player.maxHp - oldMaxHp;
-        ws.send(`你缓缓收功，结束了这一轮闭关。\n【闭关成果】经验+${expGain}，MP上限+${actualMaxMpGain}，HP上限+${actualMaxHpGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name}\n>`);
+        const eventMsg = retreatEvent?.type === 'insight'
+          ? `\n✨【顿悟】${retreatEvent.message}`
+          : retreatEvent?.type === 'bottleneck'
+          ? `\n🪨【瓶颈】${retreatEvent.message}`
+          : retreatEvent?.type === 'backlash'
+          ? `\n⚠️【走火】${retreatEvent.message}`
+          : '';
+        ws.send(`你缓缓收功，结束了这一轮闭关。${eventMsg}\n【闭关成果】经验+${expGain}，MP上限+${actualMaxMpGain}，HP上限+${actualMaxHpGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name}\n>`);
+        broadcastRetreatBreakthrough(player, retreatRoomName, retreatEvent?.type || 'normal');
         saveProgress();
         return;
       } else {
