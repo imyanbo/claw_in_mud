@@ -2100,6 +2100,33 @@ function getMeditationProgress(player) {
   };
 }
 
+function getMeditationRoomFlavor(roomName) {
+  const flavors = {
+    '练功房': [
+      '石室寂静，只闻自己呼吸渐渐绵长。',
+      '石壁微凉，你盘膝而坐，气息缓缓沉入丹田。',
+      '客栈后院偶有风过竹梢，更衬得石室幽静。'
+    ],
+    '华山练功房': [
+      '窗外山风猎猎，华山剑意仿佛也随呼吸一并沉浮。',
+      '你凝神调息，耳畔似有松涛，与内息往复相合。',
+      '山中清气入怀，胸中杂念被一点点洗去。'
+    ],
+    '少林练功房': [
+      '金砖微温，檀香若有若无，呼吸间自生庄严之意。',
+      '你抱元守一，仿佛远处晨钟余韵仍在心头回荡。',
+      '四下空明，只有一缕禅意随周天运转而愈发清晰。'
+    ]
+  };
+  const pool = flavors[roomName] || ['你屏息凝神，缓缓运转周天。'];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function getMeditationCooldownMs(player) {
+  const basicInnerSkillLevel = getSkillLevel(player, '基本内功');
+  return Math.max(4000, 12000 - basicInnerSkillLevel * 120);
+}
+
 function recalculateDerivedStats(player) {
   const baseAttr = player.先天 || { 根骨: 5, 悟性: 5, 经脉: 5, 福缘: 5 };
   const neigongLevel = getNeigongLevel(player);
@@ -3322,13 +3349,22 @@ wss.on('connection', (ws, req) => {
             ws.send('你尚未练成基本内功，暂时还感知不到打坐积累。\n>');
             break;
           }
-          ws.send(`【打坐进境】\n基本内功限制的MP加成上限: ${meditationInfo.cap}\n当前MP上限加成: ${meditationInfo.maxMpBonus}\n当前HP上限加成: ${meditationInfo.maxHpBonus}\n当前进度: ${meditationInfo.percent}%\n提示: train [气血|max] 或 dazuo [气血|max] 可继续修炼。\n>`);
+          const meditationCooldown = getMeditationCooldownMs(player);
+          const meditationRemaining = Math.max(0, meditationCooldown - (Date.now() - Number(player.lastMeditationAt || 0)));
+          ws.send(`【打坐进境】\n基本内功限制的MP加成上限: ${meditationInfo.cap}\n当前MP上限加成: ${meditationInfo.maxMpBonus}\n当前HP上限加成: ${meditationInfo.maxHpBonus}\n当前进度: ${meditationInfo.percent}%\n当前调息间隔: ${(meditationCooldown / 1000).toFixed(1)}秒\n剩余冷却: ${(meditationRemaining / 1000).toFixed(1)}秒\n提示: train [气血|max] 或 dazuo [气血|max] 可继续修炼。\n>`);
           break;
 
         case 'train':
         case 'dazuo':
           const isTrainRoom = ['练功房', '华山练功房', '少林练功房'].includes(player.room);
           if (isTrainRoom) {
+            const now = Date.now();
+            const cooldownMs = getMeditationCooldownMs(player);
+            const remainingCooldown = Math.max(0, cooldownMs - (now - Number(player.lastMeditationAt || 0)));
+            if (remainingCooldown > 0) {
+              ws.send(`你刚运功收势，气息尚未平复，还需再等${(remainingCooldown / 1000).toFixed(1)}秒。\n>`);
+              break;
+            }
             const hpArg = (parts[1] || '').toLowerCase();
             if (player.hp < Math.ceil(player.maxHp * 0.1)) {
               ws.send('你气血已不足一成，强行打坐恐走火入魔，无法继续修炼。\n>');
@@ -3400,9 +3436,11 @@ wss.on('connection', (ws, req) => {
             const capReached = player.maxMpBonus >= meditationCap;
             const capMsg = capReached ? `\n【瓶颈】受基本内功${basicInnerSkillLevel}级所限，你的打坐收益已触及当前上限。` : `\n【进境】当前打坐上限 ${player.maxMpBonus}/${meditationCap}。`;
             const titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
+            const flavorMsg = getMeditationRoomFlavor(player.room);
+            player.lastMeditationAt = now;
 
             saveProgress();
-            ws.send(`你盘膝打坐，搬运周天，以气血淬炼内息。\n气血-${actualHpCost}, MP+${actualMpGain}, MP上限+${actualMaxMpGain}, HP上限+${actualMaxHpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 基本内功:${basicInnerSkillLevel}${capMsg}${titleMsg}\n>`);
+            ws.send(`${flavorMsg}\n你盘膝打坐，搬运周天，以气血淬炼内息。\n气血-${actualHpCost}, MP+${actualMpGain}, MP上限+${actualMaxMpGain}, HP上限+${actualMaxHpGain}, 经验+${expGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 基本内功:${basicInnerSkillLevel}${capMsg}${titleMsg}\n>`);
           } else {
             let goMsg = '这里不是练功房，无法打坐修炼。\n';
             if (player.room === '客栈') goMsg += '提示: 客栈北边有练功房 (north)\n';
