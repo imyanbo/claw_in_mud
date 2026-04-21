@@ -250,7 +250,8 @@ const skillEnglishNames = {
   '碧海潮生曲': 'bihaichaoshengqu',
   '五行八卦掌': 'wuxingbaguazhang',
   '灵犀指': 'lingxizhi',
-  '天外飞仙': 'tianwaifeixian'
+  '天外飞仙': 'tianwaifeixian',
+  '学文识字': 'literacy'
 };
 
 const titles = [
@@ -1290,12 +1291,31 @@ function canLearnSkill(player, skillName, source) {
   return null;
 }
 
+function getLiteracyTeachingFlavor(teacher) {
+  const map = {
+    '岳不群': '岳不群提笔轻点，先教你辨章法，再教你从字里行间揣摩气度。',
+    'yuebuqun': '岳不群提笔轻点，先教你辨章法，再教你从字里行间揣摩气度。',
+    '风清扬': '风清扬嫌你拘泥笔画，只叫你先识剑意，再回头看书中文字。',
+    'fengqingyang': '风清扬嫌你拘泥笔画，只叫你先识剑意，再回头看书中文字。',
+    '方丈': '方丈取来旧经，叫你先静心识字，再从经义里明白持心之法。',
+    'fangzhang': '方丈取来旧经，叫你先静心识字，再从经义里明白持心之法。',
+    '玄慈': '玄慈语调平缓，一字一句领你辨认经卷中的古意。',
+    'xuanci': '玄慈语调平缓，一字一句领你辨认经卷中的古意。',
+    '黄药师': '黄药师随手写下几行奇字，要你自己拆解字形与机关。',
+    'huangyaoshi': '黄药师随手写下几行奇字，要你自己拆解字形与机关。',
+    '陆小凤': '陆小凤边笑边讲，竟把识字说得像在猜灯谜。',
+    'luxiaofeng': '陆小凤边笑边讲，竟把识字说得像在猜灯谜。'
+  };
+  return map[teacher] || `在【${getMasterDisplayName(teacher)}】的指点下，你一点点摸清文字里的门道。`;
+}
+
 function applyLearnSkill(player, skillName, source) {
   if (!player.skills[skillName]) player.skills[skillName] = { level: 0, exp: 0, learnProgress: 0 };
   const skill = player.skills[skillName];
   const nextLevel = Math.max(1, (skill.level || 0) + 1);
   const need = getSkillLearnNeed(nextLevel);
-  const gain = source.type === 'master' ? 1 + Math.max(0, Math.floor((player.先天?.悟性 || 5) / 8)) : 1;
+  const literacyBonus = skillName === '学文识字' ? 1 : Math.floor(getSkillLevel(player, '学文识字') / 15);
+  const gain = source.type === 'master' ? 1 + Math.max(0, Math.floor((player.先天?.悟性 || 5) / 8)) + literacyBonus : 1 + Math.max(0, literacyBonus - 1);
   const baseCost = 8 + Math.floor(nextLevel * 1.5) + (source.type === 'manual' ? 3 : 0);
   const cost = Math.max(8, Math.min(35, baseCost));
   player.jingli = Math.max(0, (player.jingli ?? 100) - cost);
@@ -1306,7 +1326,9 @@ function applyLearnSkill(player, skillName, source) {
     skill.level = nextLevel;
     upgraded = true;
   }
-  const sourceText = source.type === 'master' ? `在【${getMasterDisplayName(source.teacher)}】的指点下` : '对着秘籍苦苦参悟';
+  const sourceText = source.type === 'master'
+    ? (skillName === '学文识字' ? getLiteracyTeachingFlavor(source.teacher) : `在【${getMasterDisplayName(source.teacher)}】的指点下`)
+    : '对着秘籍苦苦参悟';
   const lowEnergy = player.jingli <= Math.max(10, Math.floor((player.maxJingli ?? 100) * 0.1));
   const progressText = upgraded
     ? `🔥 恭喜！你的【${skillName}】提升到了 ${skill.level} 级！`
