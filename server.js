@@ -1148,6 +1148,11 @@ function createPlayer(name) {
     // 睡觉状态
     sleeping: false,
     sleepStartTime: 0,
+    // 闭关状态
+    retreating: false,
+    retreatStartTime: 0,
+    retreatDurationMs: 0,
+    retreatRoom: null,
     // 扬州赌场掼蛋
     guandan: null,
     guandanStats: { wins: 0, games: 0, streak: 0, bestStreak: 0, profitCopper: 0 },
@@ -2697,13 +2702,9 @@ function formatOutput(player, message) {
   let armorDef = player.armor ? armors[player.armor].defense : 0;
   output += `\n【${player.name}】${player.title}\n`;
   output += `根骨:${player.先天.根骨} 悟性:${player.先天.悟性} 经脉:${player.先天.经脉} 福缘:${player.先天.福缘}\n`;
-  output += `HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli ?? 100}/${player.maxJingli ?? 100}\n`;
+  output += `HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp}\n`;
   output += `攻击:${player.外功攻击} 防御:${player.防御} 身法:${player.身法}\n`;
   output += `经验:${player.exp} 铜钱:${player.coin}\n`;
-  const meditationProgress = getMeditationProgress(player);
-  if (meditationProgress.cap > 0) {
-    output += `打坐: MP加成${meditationProgress.maxMpBonus}/${meditationProgress.cap} (${meditationProgress.percent}%) HP加成${meditationProgress.maxHpBonus}\n`;
-  }
   if (player.weapon || player.armor) {
     output += `装备: ${player.weapon || '无'}(攻+${weaponDmg}) ${player.armor || '无'}(防+${armorDef})\n`;
   }
@@ -2783,7 +2784,6 @@ wss.on('connection', (ws, req) => {
         player.sleeping = false;
         player.hp = player.maxHp;
         player.jingli = player.maxJingli ?? 100;
-        // 根据恢复情况给出不同提示
         let wakeMsg;
         if (player.hp >= player.maxHp * 0.8) {
           wakeMsg = '一觉醒来，你感到神清气爽';
@@ -2792,11 +2792,54 @@ wss.on('connection', (ws, req) => {
         } else {
           wakeMsg = '一觉醒来，你感觉腰酸背痛';
         }
-        ws.send(wakeMsg + '。\n【当前】HP: ' + player.hp + '/' + player.maxHp + ' STA: ' + player.jingli + '/' + (player.maxJingli ?? 100) + '\n>');
+        ws.send(wakeMsg + '。\n【当前】HP: ' + player.hp + '/' + player.maxHp + '\n>');
         saveProgress();
         return;
       } else {
         ws.send('你正在睡觉，不要打扰你。\n>');
+        return;
+      }
+    }
+
+    // 检查玩家是否在闭关
+    if (player && player.retreating) {
+      const now = Date.now();
+      if (now - Number(player.retreatStartTime || 0) >= Number(player.retreatDurationMs || 0)) {
+        const retreatMinutes = Math.max(1, Math.round((player.retreatDurationMs || 60000) / 60000));
+        const basicInnerSkillLevel = getSkillLevel(player, '基本内功');
+        const primaryInnerSkill = getPrimaryInnerSkill(player);
+        const expGain = Math.max(20, retreatMinutes * 18 + basicInnerSkillLevel * 3);
+        const mpBonusGain = Math.max(2, Math.floor(retreatMinutes * (1.2 + basicInnerSkillLevel * 0.08)));
+        const hpBonusGain = Math.max(1, Math.floor(mpBonusGain * 0.5));
+        const skillExpGain = Math.max(10, retreatMinutes * 8);
+        const oldMaxMp = player.maxMp;
+        const oldMaxHp = player.maxHp;
+        player.retreating = false;
+        player.retreatStartTime = 0;
+        player.retreatDurationMs = 0;
+        player.retreatRoom = null;
+        player.maxMpBonus = Math.max(0, Number(player.maxMpBonus || 0)) + mpBonusGain;
+        player.maxHpBonus = Math.max(0, Number(player.maxHpBonus || 0)) + hpBonusGain;
+        player.exp += expGain;
+        if (player.skills[primaryInnerSkill.name]) {
+          player.skills[primaryInnerSkill.name].exp = (player.skills[primaryInnerSkill.name].exp || 0) + skillExpGain;
+          if (player.skills[primaryInnerSkill.name].exp >= player.skills[primaryInnerSkill.name].level * 28) {
+            player.skills[primaryInnerSkill.name].exp = 0;
+            player.skills[primaryInnerSkill.name].level += 1;
+          }
+        }
+        recalculateDerivedStats(player);
+        player.hp = Math.min(player.maxHp, Math.max(player.hp, Math.floor(player.maxHp * 0.7)));
+        player.mp = player.maxMp;
+        player.title = getTitle(player.exp);
+        const actualMaxMpGain = player.maxMp - oldMaxMp;
+        const actualMaxHpGain = player.maxHp - oldMaxHp;
+        ws.send(`你缓缓收功，结束了这一轮闭关。\n【闭关成果】经验+${expGain}，MP上限+${actualMaxMpGain}，HP上限+${actualMaxHpGain}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} 主修内功:${primaryInnerSkill.name}\n>`);
+        saveProgress();
+        return;
+      } else {
+        const remainSec = Math.max(1, Math.ceil((Number(player.retreatDurationMs || 0) - (now - Number(player.retreatStartTime || 0))) / 1000));
+        ws.send(`你正在闭关参悟，暂时无暇分心，还需${remainSec}秒方可出关。\n>`);
         return;
       }
     }
@@ -3084,27 +3127,22 @@ wss.on('connection', (ws, req) => {
         
         case 'sleep':
         case '睡觉':
-          // 检查是否在可休息房间
           if (!['客房', '少林僧房'].includes(player.room)) {
             ws.send('这不是你睡觉的地方。\n>');
             break;
           }
-          // 检查是否已经在睡觉
           if (player.sleeping) {
             ws.send('你已经在睡觉了。\n>');
             break;
           }
-          // 开始睡觉
           player.sleeping = true;
           player.sleepStartTime = Date.now();
           ws.send('你往床上一倒，沉沉睡去......\n');
-          // 20秒后醒来
           setTimeout(() => {
             if (player && player.sleeping) {
               player.sleeping = false;
               player.hp = player.maxHp;
               player.jingli = player.maxJingli ?? 100;
-              // 根据恢复情况给出不同提示
               let wakeMsg;
               if (player.hp >= player.maxHp * 0.8) {
                 wakeMsg = '一觉醒来，你感到神清气爽';
@@ -3113,10 +3151,40 @@ wss.on('connection', (ws, req) => {
               } else {
                 wakeMsg = '一觉醒来，你感觉腰酸背痛';
               }
-              ws.send(wakeMsg + '。\n【当前】HP: ' + player.hp + '/' + player.maxHp + ' STA: ' + player.jingli + '/' + (player.maxJingli ?? 100) + '\n>');
+              ws.send(wakeMsg + '。\n【当前】HP: ' + player.hp + '/' + player.maxHp + '\n>');
               saveProgress();
             }
           }, 20000);
+          break;
+
+        case 'retreat':
+        case '闭关':
+          if (!['练功房', '华山练功房', '少林练功房', '思过崖', '方丈室'].includes(player.room)) {
+            ws.send('这里心神纷杂，不是闭关的好地方。\n>');
+            break;
+          }
+          if (player.retreating) {
+            ws.send('你已经在闭关中了。\n>');
+            break;
+          }
+          if (player.sleeping) {
+            ws.send('你还没醒，就别想着闭关了。\n>');
+            break;
+          }
+          const retreatArg = Number(parts[1] || 1);
+          if (!Number.isInteger(retreatArg) || retreatArg <= 0 || retreatArg > 10) {
+            ws.send('用法: retreat [分钟]，范围 1-10 分钟，例如 retreat 3。\n>');
+            break;
+          }
+          if (player.hp < Math.ceil(player.maxHp * 0.5)) {
+            ws.send('你气血未复，至少要在五成以上才适合闭关。\n>');
+            break;
+          }
+          player.retreating = true;
+          player.retreatStartTime = Date.now();
+          player.retreatDurationMs = retreatArg * 60 * 1000;
+          player.retreatRoom = player.room;
+          ws.send(`你寻了一处僻静角落，封息敛念，开始闭关 ${retreatArg} 分钟。\n闭关期间无法行动，时间一到将自动出关。\n>`);
           break;
         
         case 'hp':
@@ -5339,6 +5407,7 @@ skills - 查看技能
 learn [技能] - 学习技能
 train [气血|max] / dazuo [气血|max] - 打坐修炼(消耗HP，提升MP上限并带动HP上限)
 meditate / 打坐信息 - 查看当前打坐进度与上限
+retreat [分钟] / 闭关 [分钟] - 闭关修炼(1-10分钟)
 shop - 查看商店
 buy [物品] - 购买
 inventory/i - 查看包裹
