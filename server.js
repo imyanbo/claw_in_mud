@@ -295,8 +295,8 @@ const masterSkillLevels = {
   'fengqingyang': { '基本轻功': 18, '基本拳法': 15, '孤独九剑': 20 },
   '方丈': { '基本内功': 18, '罗汉拳': 16, '基本轻功': 12, '易筋经': 17 },
   'fangzhang': { '基本内功': 18, '罗汉拳': 16, '基本轻功': 12, '易筋经': 17 },
-  '玄慈': { '基本内功': 17, '罗汉拳': 15, '易筋经': 16 },
-  'xuanci': { '基本内功': 17, '罗汉拳': 15, '易筋经': 16 },
+  '玄慈': { '基本内功': 17, '罗汉拳': 15, '易筋经': 16, '学文识字': 16 },
+  'xuanci': { '基本内功': 17, '罗汉拳': 15, '易筋经': 16, '学文识字': 16 },
   '扫地僧': { '基本内功': 22, '易筋经': 21, '北冥神功': 19 },
   'saodisen': { '基本内功': 22, '易筋经': 21, '北冥神功': 19 },
   '张三丰': { '基本内功': 20, '基本轻功': 16, '太极拳': 18 },
@@ -3479,11 +3479,18 @@ wss.on('connection', (ws, req) => {
           }
           if (!breakthroughInfo.ok) {
             const roomNeedMsg = breakthroughInfo.req.requiredRoom ? `，地点${breakthroughInfo.req.requiredRoom}` : '';
-            ws.send(`你尝试冲击${breakthroughInfo.req.realm}境界，却觉火候未足。\n需求: 经验${breakthroughInfo.req.minExp}，主修内功${breakthroughInfo.req.minMastery}级${roomNeedMsg}\n当前: 经验${player.exp}，${breakthroughInfo.primaryInnerSkill.name}${breakthroughInfo.primaryInnerSkill.level}级，所在${player.room}\n>`);
+            player.hp = Math.max(1, player.hp - Math.max(3, Math.floor(player.maxHp * 0.05)));
+            player.mp = Math.max(0, player.mp - Math.max(5, Math.floor(player.maxMp * 0.08)));
+            ws.send(`你尝试冲击${breakthroughInfo.req.realm}境界，却觉火候未足，真息回荡之下反受其震。\n需求: 经验${breakthroughInfo.req.minExp}，主修内功${breakthroughInfo.req.minMastery}级${roomNeedMsg}\n当前: 经验${player.exp}，${breakthroughInfo.primaryInnerSkill.name}${breakthroughInfo.primaryInnerSkill.level}级，所在${player.room}\n【反噬】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp}\n>`);
+            saveProgress();
             break;
           }
           player.exp += Math.floor(breakthroughInfo.req.minExp * 0.08);
           ws.send(`你凝神聚气，终于成功稳住${breakthroughInfo.req.realm}境界的门槛，体内真息更见圆融。\n【境界】当前已可稳固于${getCultivationRealm(player)}\n>`);
+          const roomMates = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
+          for (const mate of roomMates) {
+            if (onlinePlayers[mate.name]) onlinePlayers[mate.name].send(`【江湖】${player.name}盘膝良久，忽然衣袂无风自动，似是成功破境！\n>`);
+          }
           saveProgress();
           break;
 
@@ -4293,6 +4300,26 @@ wss.on('connection', (ws, req) => {
           } else {
             ws.send('没有这种物品。\n>');
           }
+          break;
+
+        case 'read':
+        case '阅读':
+          if (!args) {
+            ws.send('用法: read [秘籍名/残卷名/壁画名]\n>');
+            break;
+          }
+          const readableItem = player.inventory.find(item => item === args) || args;
+          const literacyNeed = getManualLiteracyRequirement(readableItem);
+          const literacyLevel = getSkillLevel(player, '学文识字');
+          if (literacyNeed <= 0) {
+            ws.send(`【${readableItem}】上并无可供参悟的文字。\n>`);
+            break;
+          }
+          if (literacyLevel < literacyNeed) {
+            ws.send(`你展开【${readableItem}】，只觉字迹艰深古拙，难以尽识。\n需求: 学文识字 ${literacyNeed} 级\n当前: ${literacyLevel} 级\n>`);
+            break;
+          }
+          ws.send(`你静下心来细读【${readableItem}】。\n纸上字句渐渐分明，你对其中隐含的武学义理多了几分把握。\n【识读】学文识字 ${literacyLevel} 级，可顺利参悟此物。\n>`);
           break;
 
         case 'i':
