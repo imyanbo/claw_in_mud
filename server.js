@@ -1222,6 +1222,32 @@ function getManualLiteracyRequirement(itemName = '') {
   return 0;
 }
 
+function getManualFragments(itemName = '') {
+  const map = {
+    '九阴真经残卷': { target: '九阴真经', needed: 3 },
+    '九阳真经残卷': { target: '九阳神功', needed: 3 },
+    '北冥残卷': { target: '北冥神功', needed: 2 },
+    '落英残卷': { target: '落英神掌', needed: 2 }
+  };
+  return map[itemName] || null;
+}
+
+function rollReadingEvent(player, itemName) {
+  const literacyLevel = getSkillLevel(player, '学文识字');
+  const insightChance = Math.min(0.2, 0.04 + literacyLevel * 0.006);
+  const misreadChance = Math.max(0.03, 0.12 - literacyLevel * 0.004);
+  const roll = Math.random();
+  if (roll < misreadChance) {
+    return { type: 'misread', message: '你一时错会其意，反把几句关键处读得南辕北辙。' };
+  }
+  if (roll > 1 - insightChance) {
+    return itemName.includes('残卷')
+      ? { type: 'fragment', message: '你反复比对残缺字迹，竟隐约拼出了一条新的线索。' }
+      : { type: 'insight', message: '你读到会心处，忽觉胸中一亮，对其中义理顿生明悟。' };
+  }
+  return null;
+}
+
 function hasManualForSkill(player, skillName, roomName) {
   const manuals = skillBooks[skillName] || [];
   if (manuals.some(item => player.inventory.includes(item))) return true;
@@ -4325,7 +4351,46 @@ wss.on('connection', (ws, req) => {
           if (readableItem.includes('残卷')) readFlavor = '残卷缺页断行，你只能从只言片语中勉强拼出些许线索。';
           else if (readableItem.includes('壁画')) readFlavor = '壁上纹理与图形交错，你一边辨字，一边揣摩其中藏着的招意。';
           else if (readableItem.includes('真经') || readableItem.includes('秘籍')) readFlavor = '经页上的字句层层递进，你越读越觉其中别有洞天。';
-          ws.send(`你静下心来细读【${readableItem}】。\n${readFlavor}\n【识读】学文识字 ${literacyLevel} 级，可顺利参悟此物。\n>`);
+          const readingEvent = rollReadingEvent(player, readableItem);
+          let eventMsg = '';
+          if (readingEvent?.type === 'misread') {
+            player.jingli = Math.max(0, (player.jingli ?? player.maxJingli) - 5);
+            eventMsg = `\n⚠️【误读】${readingEvent.message}`;
+          } else if (readingEvent?.type === 'insight') {
+            player.exp += 5;
+            eventMsg = `\n✨【领悟】${readingEvent.message}`;
+          } else if (readingEvent?.type === 'fragment') {
+            const fragment = getManualFragments(readableItem);
+            if (fragment) {
+              player.manualFragments = player.manualFragments || {};
+              player.manualFragments[readableItem] = Math.min(fragment.needed, Number(player.manualFragments[readableItem] || 0) + 1);
+              eventMsg = `\n🧩【残页线索】${readingEvent.message} (${player.manualFragments[readableItem]}/${fragment.needed})`;
+            }
+          }
+          ws.send(`你静下心来细读【${readableItem}】。\n${readFlavor}${eventMsg}\n【识读】学文识字 ${literacyLevel} 级，可顺利参悟此物。\n>`);
+          saveProgress();
+          break;
+
+        case 'combine':
+        case '拼合':
+          if (!args) {
+            ws.send('用法: combine [残卷名]，例如 combine 九阴真经残卷\n>');
+            break;
+          }
+          const fragmentInfo = getManualFragments(args);
+          if (!fragmentInfo) {
+            ws.send('这件东西并不是可拼合的残卷。\n>');
+            break;
+          }
+          const currentCount = Number(player.manualFragments?.[args] || 0);
+          if (currentCount < fragmentInfo.needed) {
+            ws.send(`你手中关于【${args}】的线索还不够。当前 ${currentCount}/${fragmentInfo.needed}。\n>`);
+            break;
+          }
+          player.manualFragments[args] = 0;
+          if (!player.inventory.includes(fragmentInfo.target)) player.inventory.push(fragmentInfo.target);
+          saveProgress();
+          ws.send(`你将多次所得的残页线索反复拼合，终于整理出一份较完整的【${fragmentInfo.target}】！\n>`);
           break;
 
         case 'i':
@@ -5804,6 +5869,8 @@ meditate / 打坐信息 - 查看当前打坐进度与上限
 retreat [分钟] / 闭关 [分钟] - 闭关修炼(1-10分钟)
 breakretreat / 出关 - 提前强行出关
 breakthrough / 破境 - 尝试突破当前境界门槛
+read [秘籍] / 阅读 [秘籍] - 阅读秘籍、残卷、壁画
+combine [残卷] / 拼合 [残卷] - 拼合残页线索
 废功 [内功] - 自废某门内功修为
 叛师 - 退出当前师门
 shop - 查看商店
