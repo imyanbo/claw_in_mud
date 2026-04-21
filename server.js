@@ -3322,18 +3322,14 @@ wss.on('connection', (ws, req) => {
             ws.send('你尚未练成基本内功，暂时还感知不到打坐积累。\n>');
             break;
           }
-          ws.send(`【打坐进境】\n基本内功限制的MP加成上限: ${meditationInfo.cap}\n当前MP上限加成: ${meditationInfo.maxMpBonus}\n当前HP上限加成: ${meditationInfo.maxHpBonus}\n当前进度: ${meditationInfo.percent}%\n提示: train [气血] 或 dazuo [气血] 可继续修炼。\n>`);
+          ws.send(`【打坐进境】\n基本内功限制的MP加成上限: ${meditationInfo.cap}\n当前MP上限加成: ${meditationInfo.maxMpBonus}\n当前HP上限加成: ${meditationInfo.maxHpBonus}\n当前进度: ${meditationInfo.percent}%\n提示: train [气血|max] 或 dazuo [气血|max] 可继续修炼。\n>`);
           break;
 
         case 'train':
         case 'dazuo':
           const isTrainRoom = ['练功房', '华山练功房', '少林练功房'].includes(player.room);
           if (isTrainRoom) {
-            const hpCostRaw = Number(parts[1]);
-            if (!Number.isInteger(hpCostRaw) || hpCostRaw <= 0) {
-              ws.send('用法: train [消耗气血]，例如 train 50。dazuo 与 train 同义。\n>');
-              break;
-            }
+            const hpArg = (parts[1] || '').toLowerCase();
             if (player.hp < Math.ceil(player.maxHp * 0.1)) {
               ws.send('你气血已不足一成，强行打坐恐走火入魔，无法继续修炼。\n>');
               break;
@@ -3344,7 +3340,17 @@ wss.on('connection', (ws, req) => {
               ws.send('你现在的气血太低，至少要保留一成气血才能打坐。\n>');
               break;
             }
-            const hpCost = Math.min(hpCostRaw, maxSpendableHp);
+            let hpCost;
+            if (hpArg === 'max' || hpArg === '最大') {
+              hpCost = maxSpendableHp;
+            } else {
+              const hpCostRaw = Number(parts[1]);
+              if (!Number.isInteger(hpCostRaw) || hpCostRaw <= 0) {
+                ws.send('用法: train [消耗气血|max]，例如 train 50 或 train max。dazuo 与 train 同义。\n>');
+                break;
+              }
+              hpCost = Math.min(hpCostRaw, maxSpendableHp);
+            }
             const basicInnerSkillLevel = getSkillLevel(player, '基本内功');
             if (basicInnerSkillLevel <= 0) {
               ws.send('你尚未掌握基本内功，贸然打坐只会徒耗气血。\n>');
@@ -5185,7 +5191,7 @@ u/d - 上/下楼梯
 status/状态 - 查看状态
 skills - 查看技能
 learn [技能] - 学习技能
-train [气血] / dazuo [气血] - 打坐修炼(消耗HP，提升MP上限并带动HP上限)
+train [气血|max] / dazuo [气血|max] - 打坐修炼(消耗HP，提升MP上限并带动HP上限)
 meditate / 打坐信息 - 查看当前打坐进度与上限
 shop - 查看商店
 buy [物品] - 购买
