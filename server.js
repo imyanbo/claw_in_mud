@@ -852,7 +852,8 @@ const vendettas = new Map();
 const skills = {
   '基本内功': { level: 1, exp: 0 },
   '基本拳法': { level: 1, exp: 0 },
-  '基本轻功': { level: 1, exp: 0 }
+  '基本轻功': { level: 1, exp: 0 },
+  '学文识字': { level: 0, exp: 0, learnProgress: 0 }
 };
 
 const schoolPerformDb = {
@@ -1194,20 +1195,20 @@ function getSkillLearnNeed(level) {
 }
 
 function getManualSkillCap(skillName) {
-  if (['基本内功', '基本拳法', '基本轻功', '罗汉拳', '太祖长拳', '伏虎拳'].includes(skillName)) return 12;
+  if (['基本内功', '基本拳法', '基本轻功', '罗汉拳', '太祖长拳', '伏虎拳', '学文识字'].includes(skillName)) return 12;
   return 8;
 }
 
 function getLearnableSkillsForMaster(masterKey) {
   const master = masters[masterKey];
   if (!master?.skill) return [];
-  const list = [master.skill];
+  const list = [master.skill, '学文识字'];
   if (master.school === '华山派') list.push('基本内功', '基本拳法', '基本轻功');
   if (master.school === '少林寺') list.push('基本内功', '罗汉拳', '基本轻功');
   if (master.school === '武当派') list.push('基本内功', '太极拳', '基本轻功');
   if (master.school === '桃花岛') list.push('弹指神通', '玉箫剑法', '碧海潮生曲');
   if (master.school === '逍遥派') list.push('基本轻功');
-  return [...new Set(list.filter(name => skillDb[name]))];
+  return [...new Set(list.filter(name => skillDb[name] || name === '学文识字'))];
 }
 
 function hasManualForSkill(player, skillName, roomName) {
@@ -2352,6 +2353,8 @@ function broadcastRetreatBreakthrough(player, roomName, eventType) {
 
 function recalculateDerivedStats(player) {
   const baseAttr = player.先天 || { 根骨: 5, 悟性: 5, 经脉: 5, 福缘: 5 };
+  const literacyLevel = getSkillLevel(player, '学文识字');
+  const effectiveWuxing = baseAttr.悟性 + Math.floor(literacyLevel / 12);
   const neigongLevel = getNeigongLevel(player);
   const wugongLevel = getWugongLevel(player);
   const baseInnerSkillLevel = getSkillLevel(player, '基本内功');
@@ -2364,15 +2367,17 @@ function recalculateDerivedStats(player) {
   player.maxHpBonus = meditationHpBonus;
   player.maxMp = Math.floor((50 + baseAttr.经脉 * 5 + neigongLevel * 6 + baseInnerSkillLevel * 3 + meditationMpBonus) * conflictFactor);
   player.maxHp = Math.floor((100 + baseAttr.根骨 * 10 + neigongLevel * 3 + Math.floor(player.maxMp * 0.18) + meditationHpBonus) * (0.82 + conflictFactor * 0.18));
+  player.maxJingli = 100 + literacyLevel * 4 + Math.floor(effectiveWuxing * 3);
   player.外功攻击 = 10 + baseAttr.根骨 * 2 + wugongLevel * 2;
   player.内功攻击 = Math.floor(neigongLevel * 1.2);
   player.防御 = 5 + Math.floor(baseAttr.根骨 / 2) + Math.floor(neigongLevel / 3);
-  player.身法 = 10 + baseAttr.悟性 + Math.floor(wugongLevel / 3);
-  player.命中 = 80 + baseAttr.悟性 * 2 + Math.floor(wugongLevel * 0.8);
+  player.身法 = 10 + effectiveWuxing + Math.floor(wugongLevel / 3);
+  player.命中 = 80 + effectiveWuxing * 2 + Math.floor(wugongLevel * 0.8);
   player.闪避 = 10 + Math.floor(baseAttr.经脉 / 2) + Math.floor(player.身法 / 8);
   player.暴击 = 5 + Math.floor(baseAttr.福缘 / 2) + Math.floor(wugongLevel / 5);
   player.hp = Math.max(0, Math.min(player.hp ?? player.maxHp, player.maxHp));
   player.mp = Math.max(0, Math.min(player.mp ?? player.maxMp, player.maxMp));
+  player.jingli = Math.max(0, Math.min(player.jingli ?? player.maxJingli, player.maxJingli));
   player.气血 = player.hp;
   player.内力 = player.mp;
 }
@@ -2860,7 +2865,7 @@ function formatOutput(player, message) {
   let armorDef = player.armor ? armors[player.armor].defense : 0;
   output += `\n【${player.name}】${player.title}\n`;
   output += `根骨:${player.先天.根骨} 悟性:${player.先天.悟性} 经脉:${player.先天.经脉} 福缘:${player.先天.福缘}\n`;
-  output += `HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp}\n`;
+  output += `HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli ?? 100}/${player.maxJingli ?? 100}\n`;
   output += `攻击:${player.外功攻击} 防御:${player.防御} 身法:${player.身法}\n`;
   output += `经验:${player.exp} 铜钱:${player.coin}\n`;
   output += `修炼境界:${getCultivationRealm(player)} 主修内功:${getPrimaryInnerSkill(player).name}\n`;
@@ -3672,6 +3677,7 @@ wss.on('connection', (ws, req) => {
           const conflictPenalty = getNeigongConflictPenalty(player);
           skillMsg += `修炼境界: ${getCultivationRealm(player)}\n`;
           skillMsg += `主修内功: ${getPrimaryInnerSkill(player).name}\n`;
+          skillMsg += `学文识字: ${getSkillLevel(player, '学文识字')}级\n`;
           const breakthrough = canBreakthroughRealm(player);
           if (breakthrough.req) {
             skillMsg += `破境条件: ${breakthrough.req.realm} 需经验${breakthrough.req.minExp}、主修内功${breakthrough.req.minMastery}级 (${breakthrough.ok ? '已满足' : '未满足'})\n`;
@@ -5039,8 +5045,9 @@ wss.on('connection', (ws, req) => {
           player.master = null;
           player.school = null;
           player.exp = Math.max(0, player.exp - 50);
+          player.betrayUntil = Date.now() + 72 * 3600000;
           saveProgress();
-          ws.send(`你决意离开【${oldSchool}】，与师父【${oldMaster}】恩断义绝。江湖路远，从此只能另寻前程。\n>`);
+          ws.send(`你决意离开【${oldSchool}】，与师父【${oldMaster}】恩断义绝。三日之内，江湖各派多半不会轻易再收你。\n>`);
           break;
 
         case 'baishi':
@@ -5051,6 +5058,11 @@ wss.on('connection', (ws, req) => {
           }
           if (player.master) {
             ws.send(`你已有师父【${player.master}】，不能拜师。\n>`);
+            break;
+          }
+          if (player.betrayUntil && Date.now() < Number(player.betrayUntil)) {
+            const remainHours = Math.ceil((Number(player.betrayUntil) - Date.now()) / 3600000);
+            ws.send(`你叛师余波未平，江湖中人尚有耳闻。至少还需 ${remainHours} 小时，别派才可能重新收你。\n>`);
             break;
           }
           if (!masters[args]) {
