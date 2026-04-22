@@ -216,6 +216,12 @@ const drinkItems = {
     hp: 18, mp: 18, jingli: 0, drunkValue: 10, cooldown: 10000,
     insightChance: 0.25, expBonus: 5,
     selfFlavor: '甘香入口，竟带着山林清气，仿佛连胸中浊念都被洗去了半分。'
+  },
+  '竹叶青': {
+    type: '酒', category: '雅酒', price: 60, weight: 1, desc: '清芬透鼻，入口清烈。',
+    hp: 0, mp: 16, jingli: 4, drunkValue: 12, cooldown: 9000,
+    insightChance: 0.22, expBonus: 4,
+    selfFlavor: '竹叶清香直透鼻端，酒意却在喉间忽然转烈，像一缕寒风卷过肺腑。'
   }
 };
 
@@ -1937,6 +1943,23 @@ function maybeBroadcastDrinkEasterEgg(player, drinkName) {
   if (text) broadcastRoomAction(player, text);
 }
 
+function handleSharedDrink(player, targetName) {
+  const roomPlayers = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
+  const target = roomPlayers.find(p => p.name === targetName);
+  if (!target) return 'NO_TARGET';
+  if (player.coin < 20) return 'NO_MONEY';
+  player.coin -= 20;
+  target.jingli = Math.min(target.maxJingli ?? 100, (target.jingli ?? 100) + 8);
+  target.drunk = Math.min(120, Number(target.drunk || 0) + 4);
+  target.lastDrinkDecayAt = Date.now();
+  recalculateDerivedStats(target);
+  broadcastRoomAction(player, `${player.name}招呼店家温了一壶酒，笑着请${target.name}同桌共饮。酒香四散，周围几人都忍不住多看了两眼。`);
+  if (onlinePlayers[target.name]) {
+    onlinePlayers[target.name].send(`【共饮】${player.name}请你喝了一轮酒。你抿了几口，只觉胸口微暖，酒意略起。\n>`);
+  }
+  return 'OK';
+}
+
 function getDrunkMovementFumble(player) {
   const stage = getDrunkStage(player);
   if (stage.key === 'wasted' && Math.random() < 0.4) {
@@ -1977,6 +2000,15 @@ function transformDrunkSpeech(player, text) {
     return `${msg} 哈。`;
   }
   return msg;
+}
+
+function broadcastRoomSpeech(player, prefix, content) {
+  for (const [name, client] of Object.entries(onlinePlayers)) {
+    if (name === player.name) continue;
+    if (players[name]?.room === player.room) {
+      client.send(`${prefix}${player.name}: ${content}\n>`);
+    }
+  }
 }
 
 function getDrunkWakeEffect(player) {
@@ -4349,6 +4381,23 @@ wss.on('connection', (ws, req) => {
           ws.send(shopMsg + '\n>');
           break;
 
+        case 'treat':
+        case '请酒':
+          if (!args) {
+            ws.send('用法: 请酒 玩家名\n>');
+            break;
+          }
+          const treatResult = handleSharedDrink(player, args);
+          if (treatResult === 'NO_TARGET') {
+            ws.send('对方不在这里，没法同桌喝酒。\n>');
+          } else if (treatResult === 'NO_MONEY') {
+            ws.send('你囊中羞涩，连请一轮酒的钱都凑不出来。\n>');
+          } else {
+            saveProgress();
+            ws.send(`你请${args}喝了一轮酒，花了20铜钱。\n>`);
+          }
+          break;
+
         case 't':
         case 'talk':
         case '对话':
@@ -5403,6 +5452,18 @@ wss.on('connection', (ws, req) => {
           }
           break;
 
+        case 'say':
+        case '讲话':
+        case '说':
+          if (!args) {
+            ws.send('用法: say 你想说的话\n>');
+            break;
+          }
+          const finalSayMsg = transformDrunkSpeech(player, args);
+          broadcastRoomSpeech(player, '【闲聊】', finalSayMsg);
+          ws.send(`你说道: ${finalSayMsg}\n>`);
+          break;
+
         // @xxx 私聊功能
         case '@':
           // 用法: @对方名字 消息
@@ -5437,8 +5498,9 @@ wss.on('connection', (ws, req) => {
           }
           player.气血 -= 50;
           player.coin -= 100;
+          const finalAllMsg = transformDrunkSpeech(player, args);
           for (const [name, client] of Object.entries(onlinePlayers)) {
-            client.send(`【全体公告】【${player.name}】\${args}\n══════════════════════════════\n`);
+            client.send(`【全体公告】【${player.name}】${finalAllMsg}\n══════════════════════════════\n`);
           }
           break;
 
@@ -6242,6 +6304,8 @@ shop - 查看商店
 buy [物品] - 购买
 inventory/i - 查看包裹
 drink/喝 [酒名] - 饮酒
+say/说 [内容] - 与同房间的人说话
+treat/请酒 [玩家名] - 请同房间玩家喝一轮酒
 fight - 战斗
 guandan - 扬州赌场简化掼蛋
   guandan hint/auto 可获得提示或自动打一手

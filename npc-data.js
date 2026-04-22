@@ -13,6 +13,7 @@ const npcCatalog = {
       items: [
         { name: '女儿红', price: 35, currency: 'coin', desc: '香气绵长，入口柔和。' },
         { name: '米酒', price: 16, currency: 'coin', desc: '温和顺口，最适合慢慢浅酌。' },
+        { name: '竹叶青', price: 62, currency: 'coin', desc: '清芬透鼻，回味却透着一丝冷烈。' },
         { name: '烧刀子', price: 52, currency: 'coin', desc: '烈得呛喉，喝下去最显豪气。' },
         { name: '猴儿酒', price: 98, currency: 'coin', desc: '山中异酿，颇有灵气。' }
       ]
@@ -64,6 +65,7 @@ const npcCatalog = {
         { name: '米酒', price: 14, currency: 'coin', desc: '暖胃的家常米酒。' },
         { name: '女儿红', price: 32, currency: 'coin', desc: '陈香柔和，最受过路客喜爱。' },
         { name: '汾酒', price: 40, currency: 'coin', desc: '清冽回甘，后劲悠长。' },
+        { name: '竹叶青', price: 58, currency: 'coin', desc: '酒色清碧，适合慢慢品。' },
         { name: '热酒', price: 18, currency: 'coin', desc: '暖身热酒，适合夜里驱寒。' }
       ]
     },
