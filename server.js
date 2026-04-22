@@ -13,7 +13,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const WS_HEARTBEAT_INTERVAL_MS = 30000;
-const WS_HEARTBEAT_MISS_LIMIT = 4;
+const WS_HEARTBEAT_MISS_LIMIT = 6;
 
 function heartbeat() {
   this.isAlive = true;
@@ -2993,6 +2993,12 @@ wss.on('connection', (ws, req) => {
 
   ws.on('message', async (data) => {
     const input = data.toString().trim();
+
+    if (input === '/ping') {
+      ws.isAlive = true;
+      ws.missedPongs = 0;
+      return;
+    }
 
     if (input.startsWith('/client_version ')) {
       ws.clientVersion = input.substring('/client_version '.length).trim();

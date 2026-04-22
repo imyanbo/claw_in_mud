@@ -184,7 +184,7 @@
         const regex = new RegExp('(^|[^\u4e00-\u9fa5])(' + escapedPlace + ')(?![\u4e00-\u9fa5])', 'g');
         result = result.replace(regex, clickableSpan(place, 'go ' + place));
       });
-      result = result.replace(/([\u4e00-\u9fa5]+)（([a-zA-Z0-9_]+)）(?=，|。|\s*口头语|\s*看起来|\s*，)/g, (full, cn, en) => {
+            result = result.replace(/([\u4e00-\u9fa5]+)（([a-zA-Z0-9_]+)）/g, (full, cn, en) => {
         return '<span class="clickable-cmd" onclick="prepareAskNpc(' + JSON.stringify(cn).replace(/"/g, '&quot;') + ')">' + escapeHtml(cn) + '</span>（' + escapeHtml(en) + '）';
       });
       // 处理出口描述中的地点
@@ -198,11 +198,16 @@
         return clickableSpan('学习', `learn ${skill} from ${teacher}`);
       });
       result = result.replace(/你看到:\s*([^\n<]+)/g, (full, seenPart) => {
-        const clickableSeen = seenPart.replace(/([A-Za-z0-9_\u4e00-\u9fa5]+)(?=、|\n|$)/g, (m, name) => {
-          if (!npcNamePattern.test(name)) return m;
-          if (name.includes('走了过来')) return m;
-          return clickableSpan(name, `talk ${name}`);
-        });
+        const clickableSeen = seenPart
+          .split('、')
+          .map((part) => {
+            const name = part.trim();
+            if (!name) return part;
+            if (name.includes('走了过来') || name.includes('在线') || name.includes('离线')) return escapeHtml(name);
+            if (!npcNamePattern.test(name)) return escapeHtml(name);
+            return '<span class="clickable-cmd" onclick="prepareAskNpc(' + JSON.stringify(name).replace(/"/g, '&quot;') + ')">' + escapeHtml(name) + '</span>';
+          })
+          .join('、');
         return '你看到: ' + clickableSeen;
       });
       // 处理方向关键词
@@ -357,12 +362,12 @@
     }
     
     function startHeartbeat() {
-      // 每60秒发送心跳（带趣味指令）
+      // 每20秒发送一次轻量心跳，减少移动端后台挂起时被服务端误判断线
       heartbeatInterval = setInterval(() => {
         if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send('/weather');  // 服务端会返回随机趣味内容
+          ws.send('/ping');
         }
-      }, 60000);
+      }, 20000);
     }
     
     function stopHeartbeat() {
