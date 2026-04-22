@@ -2062,6 +2062,25 @@ function maybeGrantTavernIntel(player) {
   return snippet;
 }
 
+function consumeIntelAftermathBroadcast(player) {
+  const aftermath = player.questProgress?.intelAftermath;
+  if (!aftermath?.flags?.length) return '';
+  const flag = aftermath.flags.shift();
+  if (flag === 'official_pressure') {
+    return '【城中风声】六扇门这两日巡得更勤了，街口盘问比往常也严了几分。有人低声说，官府像是收到了什么准信。';
+  }
+  if (flag === 'blackmarket_stirred') {
+    return '【江湖暗流】暗巷里买消息的人忽然多了起来，连情报贩子的叫价都比往日更硬气了。';
+  }
+  if (flag === 'brothel_whispers') {
+    return '【坊间耳语】丽春院里近来流出的风声忽然细密了许多，像是有人故意把话往外放。';
+  }
+  if (flag === 'inn_watchfulness') {
+    return '【客栈异动】客栈老板最近记账时格外留心来客出入，连后院脚步声都比平常更容易引人侧目。';
+  }
+  return '';
+}
+
 function sellIntelToNpc(player, npcName) {
   const state = ensureTavernIntelState(player);
   if (state.snippets.length < 2) return { ok: false, message: '你手里的风声还太零碎，至少攒够两条再去找人换消息。' };
@@ -2107,6 +2126,12 @@ function sellIntelToNpc(player, npcName) {
   relation.trust = Math.max(0, (relation.trust || 0) + reward.trust);
   relation.favor = Math.max(0, (relation.favor || 0) + reward.favor);
   relation.suspicion = Math.max(0, (relation.suspicion || 0) + reward.suspicion);
+  player.questProgress.intelAftermath = player.questProgress.intelAftermath || { flags: [], lastSoldTo: null };
+  player.questProgress.intelAftermath.lastSoldTo = npcName;
+  if (npcName === '六扇门捕头') player.questProgress.intelAftermath.flags.push('official_pressure');
+  if (npcName === '情报贩子') player.questProgress.intelAftermath.flags.push('blackmarket_stirred');
+  if (npcName === '老鸨') player.questProgress.intelAftermath.flags.push('brothel_whispers');
+  if (npcName === '客栈老板') player.questProgress.intelAftermath.flags.push('inn_watchfulness');
   state.snippets = [];
   state.intelLevel = 0;
   state.drinks = 0;
@@ -3319,6 +3344,8 @@ function getPlayerDescription(targetPlayer) {
 // 简洁输出（不带详细属性）
 function formatOutputBrief(player, message) {
   let output = `\n=== ${message} ===\n\n`;
+  const aftermathMsg = consumeIntelAftermathBroadcast(player);
+  if (aftermathMsg) output += `${aftermathMsg}\n\n`;
   const room = getRoom(player.room);
   if (room) {
     output += room.description + getCorpseSummary(player.room) + '\n';
@@ -3343,6 +3370,8 @@ function formatOutputBrief(player, message) {
 // 完整输出（带详细属性）
 function formatOutput(player, message) {
   let output = `\n=== ${message} ===\n\n`;
+  const aftermathMsg = consumeIntelAftermathBroadcast(player);
+  if (aftermathMsg) output += `${aftermathMsg}\n\n`;
   const room = getRoom(player.room);
   if (room) {
     output += room.description + getCorpseSummary(player.room) + '\n';
@@ -4812,6 +4841,16 @@ wss.on('connection', (ws, req) => {
           noteNpcInteraction(intelNpc, player, 'gift');
           saveProgress();
           ws.send(`你把酒局里拼出的风声低声卖给了${intelNpc}。\n${sellResult.message}\n>`);
+          break;
+
+        case 'intelstatus':
+        case '风声后续':
+          const aftermath = player.questProgress?.intelAftermath;
+          if (!aftermath?.flags?.length) {
+            ws.send('你最近卖出去的风声，还没在城里激起什么明显波澜。\n>');
+            break;
+          }
+          ws.send(`【风声后续】\n最近一次出手对象: ${aftermath.lastSoldTo || '无'}\n待发酵影响:\n${aftermath.flags.map((f, i) => `${i + 1}. ${f}`).join('\n')}\n>`);
           break;
 
         case 'inquire':
@@ -6540,6 +6579,7 @@ toast/敬酒 [玩家名] - 举杯相敬
 intel/风声 - 查看酒局里听到的风声
 cashintel/兑风声 - 把风声换成收益
 sellintel/卖风声 [NPC] - 把风声卖给指定人物
+intelstatus/风声后续 - 查看风声卖出后的后续影响
 fight - 战斗
 guandan - 扬州赌场简化掼蛋
   guandan hint/auto 可获得提示或自动打一手
