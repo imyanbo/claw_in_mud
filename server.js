@@ -183,6 +183,36 @@ const armors = {
   '软猬甲': { defense: 35, price: 800, weight: 12, desc: '桃花岛至宝' }
 };
 
+const drinkItems = {
+  '米酒': {
+    type: '酒', category: '普通酒', price: 12, weight: 1, desc: '温和的米酒，带着淡淡粮香。',
+    hp: 0, mp: 0, jingli: 12, drunkValue: 5, cooldown: 6000
+  },
+  '女儿红': {
+    type: '酒', category: '普通酒', price: 30, weight: 1, desc: '陈香绵长，入口微甜。',
+    hp: 12, mp: 8, jingli: 0, drunkValue: 8, cooldown: 8000
+  },
+  '烧刀子': {
+    type: '酒', category: '烈酒', price: 45, weight: 1, desc: '酒性猛烈，入喉如火。',
+    hp: 0, mp: 10, jingli: 0, drunkValue: 18, cooldown: 10000,
+    buff: { atk: 4, crit: 3, hit: -3, dodge: -3, durationMs: 180000 }
+  },
+  '汾酒': {
+    type: '酒', category: '雅酒', price: 36, weight: 1, desc: '清冽甘润，后劲却不小。',
+    hp: 0, mp: 12, jingli: 0, drunkValue: 10, cooldown: 8000,
+    insightChance: 0.18
+  },
+  '活血药酒': {
+    type: '酒', category: '药酒', price: 55, weight: 1, desc: '药香与酒气交织，可活络气血。',
+    hp: 25, mp: 0, jingli: 0, drunkValue: 12, cooldown: 12000
+  },
+  '猴儿酒': {
+    type: '酒', category: '珍酒', price: 88, weight: 1, desc: '山中异酿，灵气隐隐。',
+    hp: 18, mp: 18, jingli: 0, drunkValue: 10, cooldown: 10000,
+    insightChance: 0.25, expBonus: 5
+  }
+};
+
 const skillDb = {
   '基本内功': { type: '被动', desc: '提升最大生命值' },
   '基本拳法': { type: '被动', desc: '提升拳脚攻击力' },
@@ -1155,6 +1185,11 @@ function createPlayer(name) {
     // 打坐状态
     meditating: false,
     meditationEndTime: 0,
+    // 饮酒状态
+    drunk: 0,
+    lastDrinkAt: 0,
+    lastDrinkDecayAt: 0,
+    drinkBuffs: null,
     // 闭关状态
     retreating: false,
     retreatStartTime: 0,
@@ -1766,6 +1801,39 @@ function ensureMoneyState(player) {
   if (typeof player.gold !== 'number' || Number.isNaN(player.gold)) player.gold = 0;
   if (!player.guandan) player.guandan = null;
   if (!player.guandanStats) player.guandanStats = { wins: 0, games: 0, streak: 0, bestStreak: 0, profitCopper: 0 };
+  if (typeof player.drunk !== 'number' || Number.isNaN(player.drunk)) player.drunk = 0;
+  if (typeof player.lastDrinkAt !== 'number' || Number.isNaN(player.lastDrinkAt)) player.lastDrinkAt = 0;
+  if (!player.drinkBuffs || typeof player.drinkBuffs !== 'object') player.drinkBuffs = null;
+}
+
+function decayDrunkValue(player, now = Date.now()) {
+  const last = Number(player.lastDrinkDecayAt || now);
+  const elapsed = Math.max(0, now - last);
+  const decay = Math.floor(elapsed / 30000);
+  if (decay > 0) {
+    player.drunk = Math.max(0, Number(player.drunk || 0) - decay);
+    player.lastDrinkDecayAt = last + decay * 30000;
+  } else if (!player.lastDrinkDecayAt) {
+    player.lastDrinkDecayAt = now;
+  }
+}
+
+function getDrunkStage(player) {
+  const drunk = Number(player.drunk || 0);
+  if (drunk >= 100) return { key: 'passed_out', label: '烂醉', attackFactor: 0.8, hitDelta: -18, dodgeDelta: -18 };
+  if (drunk >= 80) return { key: 'wasted', label: '烂醉', attackFactor: 0.88, hitDelta: -12, dodgeDelta: -12 };
+  if (drunk >= 50) return { key: 'drunk', label: '大醉', attackFactor: 1.06, hitDelta: -8, dodgeDelta: -8 };
+  if (drunk >= 20) return { key: 'tipsy', label: '醺然', attackFactor: 1.03, hitDelta: -3, dodgeDelta: -3 };
+  if (drunk > 0) return { key: 'light', label: '微醺', attackFactor: 1, hitDelta: 0, dodgeDelta: 0 };
+  return { key: 'sober', label: '清醒', attackFactor: 1, hitDelta: 0, dodgeDelta: 0 };
+}
+
+function getActiveDrinkBuff(player, now = Date.now()) {
+  if (!player.drinkBuffs || Number(player.drinkBuffs.expiresAt || 0) <= now) {
+    player.drinkBuffs = null;
+    return null;
+  }
+  return player.drinkBuffs;
 }
 
 function getMoneySummary(player) {
@@ -2427,6 +2495,7 @@ function broadcastRetreatBreakthrough(player, roomName, eventType) {
 }
 
 function recalculateDerivedStats(player) {
+  decayDrunkValue(player);
   const baseAttr = player.先天 || { 根骨: 5, 悟性: 5, 经脉: 5, 福缘: 5 };
   const literacyLevel = getSkillLevel(player, '学文识字');
   const effectiveWuxing = baseAttr.悟性 + Math.floor(literacyLevel / 12);
@@ -2438,18 +2507,20 @@ function recalculateDerivedStats(player) {
   const meditationHpBonus = Math.max(0, Number(player.maxHpBonus || Math.floor(meditationMpBonus * 0.6)));
   const conflictPenalty = getNeigongConflictPenalty(player);
   const conflictFactor = Math.max(0.65, 1 - conflictPenalty.percent / 100);
+  const drunkStage = getDrunkStage(player);
+  const drinkBuff = getActiveDrinkBuff(player);
   player.maxMpBonus = meditationMpBonus;
   player.maxHpBonus = meditationHpBonus;
   player.maxMp = Math.floor((50 + baseAttr.经脉 * 5 + neigongLevel * 6 + baseInnerSkillLevel * 3 + meditationMpBonus) * conflictFactor);
   player.maxHp = Math.floor((100 + baseAttr.根骨 * 10 + neigongLevel * 3 + Math.floor(player.maxMp * 0.18) + meditationHpBonus) * (0.82 + conflictFactor * 0.18));
   player.maxJingli = 100 + literacyLevel * 4 + Math.floor(effectiveWuxing * 3);
-  player.外功攻击 = 10 + baseAttr.根骨 * 2 + wugongLevel * 2;
+  player.外功攻击 = Math.floor((10 + baseAttr.根骨 * 2 + wugongLevel * 2) * drunkStage.attackFactor) + (drinkBuff?.atk || 0);
   player.内功攻击 = Math.floor(neigongLevel * 1.2);
   player.防御 = 5 + Math.floor(baseAttr.根骨 / 2) + Math.floor(neigongLevel / 3);
   player.身法 = 10 + effectiveWuxing + Math.floor(wugongLevel / 3);
-  player.命中 = 80 + effectiveWuxing * 2 + Math.floor(wugongLevel * 0.8);
-  player.闪避 = 10 + Math.floor(baseAttr.经脉 / 2) + Math.floor(player.身法 / 8);
-  player.暴击 = 5 + Math.floor(baseAttr.福缘 / 2) + Math.floor(wugongLevel / 5);
+  player.命中 = 80 + effectiveWuxing * 2 + Math.floor(wugongLevel * 0.8) + drunkStage.hitDelta + (drinkBuff?.hit || 0);
+  player.闪避 = 10 + Math.floor(baseAttr.经脉 / 2) + Math.floor(player.身法 / 8) + drunkStage.dodgeDelta + (drinkBuff?.dodge || 0);
+  player.暴击 = 5 + Math.floor(baseAttr.福缘 / 2) + Math.floor(wugongLevel / 5) + (drinkBuff?.crit || 0);
   player.hp = Math.max(0, Math.min(player.hp ?? player.maxHp, player.maxHp));
   player.mp = Math.max(0, Math.min(player.mp ?? player.maxMp, player.maxMp));
   player.jingli = Math.max(0, Math.min(player.jingli ?? player.maxJingli, player.maxJingli));
@@ -2944,6 +3015,7 @@ function formatOutput(player, message) {
   output += `攻击:${player.外功攻击} 防御:${player.防御} 身法:${player.身法}\n`;
   output += `经验:${player.exp} 铜钱:${player.coin}\n`;
   output += `修炼境界:${getCultivationRealm(player)} 主修内功:${getPrimaryInnerSkill(player).name}\n`;
+  output += `酒意:${getDrunkStage(player).label} (${Math.max(0, Math.floor(player.drunk || 0))}/100)\n`;
   if (player.weapon || player.armor) {
     output += `装备: ${player.weapon || '无'}(攻+${weaponDmg}) ${player.armor || '无'}(防+${armorDef})\n`;
   }
@@ -3365,6 +3437,10 @@ wss.on('connection', (ws, req) => {
             命中: player.命中,
             闪避: player.闪避,
             暴击: player.暴击,
+            drunk: player.drunk,
+            lastDrinkAt: player.lastDrinkAt,
+            lastDrinkDecayAt: player.lastDrinkDecayAt,
+            drinkBuffs: player.drinkBuffs,
             maxMpBonus: player.maxMpBonus,
             maxHpBonus: player.maxHpBonus,
             lastMeditationAt: player.lastMeditationAt,
@@ -3468,6 +3544,10 @@ wss.on('connection', (ws, req) => {
           }
           if (player.retreating) {
             ws.send('你已经在闭关中了。\n>');
+            break;
+          }
+          if ((player.drunk || 0) >= 20) {
+            ws.send('你身上酒气未散，心神难凝，此刻不宜闭关。\n>');
             break;
           }
           if (player.sleeping) {
@@ -3682,9 +3762,67 @@ wss.on('connection', (ws, req) => {
         case '下': if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; } player.following = null; if (movePlayer(player, '下')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向下走去')); } else ws.send('下面没有路。'); break;
 
         case 'eat':
+        case 'drink':
         case '使用':
+        case '喝':
           if (!args) {
             ws.send('请输入物品名。\n>');
+            break;
+          }
+          if (cmd === 'drink' || cmd === '喝') {
+            const drink = drinkItems[args];
+            if (!drink) {
+              ws.send('这东西不是能直接喝的酒。\n>');
+              break;
+            }
+            if (!player.inventory.includes(args)) {
+              ws.send(`你背包里没有${args}。\n>`);
+              break;
+            }
+            const now = Date.now();
+            decayDrunkValue(player, now);
+            const remainingDrinkCd = Math.max(0, Number(drink.cooldown || 0) - (now - Number(player.lastDrinkAt || 0)));
+            if (remainingDrinkCd > 0) {
+              ws.send(`你酒气翻涌，暂时不宜再饮。还需 ${(remainingDrinkCd / 1000).toFixed(1)} 秒。\n>`);
+              break;
+            }
+            if ((player.drunk || 0) >= 100) {
+              ws.send('你已经醉得不省人事，再灌下去怕是要出事。\n>');
+              break;
+            }
+            player.inventory = player.inventory.filter((item, index) => !(item === args && index === player.inventory.indexOf(args)));
+            player.hp = Math.min(player.maxHp, player.hp + (drink.hp || 0));
+            player.mp = Math.min(player.maxMp, player.mp + (drink.mp || 0));
+            player.jingli = Math.min(player.maxJingli ?? 100, (player.jingli ?? 100) + (drink.jingli || 0));
+            player.drunk = Math.min(120, Number(player.drunk || 0) + Number(drink.drunkValue || 0));
+            player.lastDrinkAt = now;
+            player.lastDrinkDecayAt = now;
+            let extraMsg = '';
+            if (drink.buff) {
+              player.drinkBuffs = {
+                source: args,
+                atk: drink.buff.atk || 0,
+                crit: drink.buff.crit || 0,
+                hit: drink.buff.hit || 0,
+                dodge: drink.buff.dodge || 0,
+                expiresAt: now + (drink.buff.durationMs || 180000)
+              };
+              extraMsg += `\n【酒劲】一股烈意直冲胸臆，暂时获得额外战意。`;
+            }
+            if (drink.insightChance && Math.random() < drink.insightChance) {
+              const expGain = Number(drink.expBonus || 3);
+              player.exp += expGain;
+              extraMsg += `\n✨【酒意灵光】你胸中忽生一线明悟，经验+${expGain}。`;
+            }
+            const drunkStage = getDrunkStage(player);
+            if (player.drunk >= 100) {
+              player.fainted = true;
+              player.faintTime = now;
+              extraMsg += '\n☠️【醉倒】你只觉天旋地转，眼前一黑，当场醉倒在地。';
+            }
+            recalculateDerivedStats(player);
+            saveProgress();
+            ws.send(`你仰头饮下${args}，${drink.desc}${extraMsg}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${drunkStage.label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
             break;
           }
           if (args === 'drug' || args === '金创药') {
@@ -3902,6 +4040,10 @@ wss.on('connection', (ws, req) => {
               ws.send('你尚未掌握基本内功，贸然打坐只会徒耗气血。\n>');
               break;
             }
+            if ((player.drunk || 0) >= 50) {
+              ws.send('你酒意上头，经脉浮荡，此刻不宜打坐运功。\n>');
+              break;
+            }
             const oldHp = player.hp;
             const oldMp = player.mp;
             const oldMaxMp = player.maxMp;
@@ -4034,6 +4176,10 @@ wss.on('connection', (ws, req) => {
             shopMsg += '\n输入 buy [防具名] 购买\n';
           } else {
             shopMsg += '金创药: 20金 恢复50HP\n九转灵丹: 50金 恢复100HP\n内力丹: 30金 恢复30MP\n';
+            for (const [name, item] of Object.entries(drinkItems)) {
+              shopMsg += `${name}: ${item.price}铜钱 ${item.desc}\n`;
+            }
+            shopMsg += '\n输入 buy [物品名] 购买，drink [酒名] 饮用\n';
           }
           ws.send(shopMsg + '\n>');
           break;
@@ -4340,6 +4486,17 @@ wss.on('connection', (ws, req) => {
               player.mp = Math.min(player.maxMp, player.mp + 30);
               saveProgress();
               ws.send('内力丹使用成功，MP恢复30。\n>');
+            } else if (drinkItems[args] && player.coin >= drinkItems[args].price) {
+              const item = drinkItems[args];
+              const itemWeight = item.weight || 0;
+              if (currentWeight + itemWeight > player.maxWeight) {
+                ws.send('负重不足！无法携带更多物品。\n>');
+                break;
+              }
+              player.coin -= item.price;
+              player.inventory.push(args);
+              saveProgress();
+              ws.send(`购买成功！${args} 已放入背包。输入 drink ${args} 饮用。\n>`);
             } else {
               ws.send('金币不足或物品不存在。\n>');
             }
@@ -5139,6 +5296,7 @@ wss.on('connection', (ws, req) => {
 ╠══════════════════════════════════════╣
 ║ 【战斗衍生】                                ║
 ║ 命中: ${player.命中}%  闪避: ${player.闪避}%  暴击: ${player.暴击}%     ║
+║ 酒意: ${getDrunkStage(player).label} (${Math.max(0, Math.floor(player.drunk || 0))}/100)                 ║
 ║ 击杀: ${player.pvpKills || 0}  死亡: ${player.deaths || 0}                ║
 ╠══════════════════════════════════════╣
 ║ 经验: ${player.exp}                                  ║
@@ -5914,6 +6072,7 @@ combine [残卷] / 拼合 [残卷] - 拼合残页线索
 shop - 查看商店
 buy [物品] - 购买
 inventory/i - 查看包裹
+drink/喝 [酒名] - 饮酒
 fight - 战斗
 guandan - 扬州赌场简化掼蛋
   guandan hint/auto 可获得提示或自动打一手
