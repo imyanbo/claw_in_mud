@@ -1871,6 +1871,56 @@ function getDrinkWitnessText(player, drinkName, beforeStage, afterStage) {
   return `${player.name}又饮了一口${drinkName}，身上的酒气更重了。`;
 }
 
+function getDrunkNpcReaction(npcName, player) {
+  const stage = getDrunkStage(player);
+  if (stage.key === 'sober' || stage.key === 'light') return '';
+  if (npcName === '店小二' || npcName === '客栈老板') {
+    return stage.key === 'wasted'
+      ? `${npcName}皱眉摆手道：「这位爷，您都快站不住了，还是先坐下醒醒酒吧。」`
+      : `${npcName}看了你一眼，陪笑道：「客官酒兴不浅，可别喝得太急。」`;
+  }
+  if (npcName === '六扇门捕头' || npcName === '官兵') {
+    return stage.key === 'wasted' || stage.key === 'drunk'
+      ? `${npcName}眉头一皱，沉声道：「城中不许借酒滋事，自己当心点。」`
+      : `${npcName}瞥了你一眼，道：「少饮几杯，免得惹事。」`;
+  }
+  if (npcName === '岳不群' || npcName === '方丈' || npcName === '玄慈' || npcName === '张三丰') {
+    return `${npcName}轻轻摇头道：「酒能乱性，修行之人当知节制。」`;
+  }
+  if (npcName === '陆小凤') {
+    return `${npcName}眨了眨眼，笑道：「喝酒本是快事，可别先把自己喝趴下了。」`;
+  }
+  if (npcName === '老鸨') {
+    return `${npcName}掩口笑道：「这位爷好大的酒兴，可别一会儿连路都找不着啦。」`;
+  }
+  return '';
+}
+
+function maybeBroadcastDrunkNpcReaction(player) {
+  const room = getRoom(player.room);
+  const stage = getDrunkStage(player);
+  if (!room || (stage.key !== 'tipsy' && stage.key !== 'drunk' && stage.key !== 'wasted')) return;
+  const npcName = (room.npcs || []).find(name => getDrunkNpcReaction(name, player));
+  if (!npcName) return;
+  const reaction = getDrunkNpcReaction(npcName, player);
+  if (reaction) broadcastRoomAction(player, reaction);
+}
+
+function getDrunkMovementFumble(player) {
+  const stage = getDrunkStage(player);
+  if (stage.key === 'wasted' && Math.random() < 0.4) {
+    return '你脚下发飘，刚迈出半步就撞在门框边上，只得扶墙缓了缓，没能走出去。';
+  }
+  if (stage.key === 'drunk' && Math.random() < 0.22) {
+    return '你眼前景物微微摇晃，脚步一乱，险些摔个跟头，只好先稳住身形。';
+  }
+  return '';
+}
+
+function getPassOutWitnessText(player) {
+  return `${player.name}眼神一散，身子晃了两晃，随即扑通一声醉倒在地，半晌再无动静。`;
+}
+
 function getMoneySummary(player) {
   ensureMoneyState(player);
   return `铜钱:${player.coin} 银:${player.silver} 金:${player.gold}`;
@@ -3775,25 +3825,25 @@ wss.on('connection', (ws, req) => {
         case '北':
           if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
-          if (movePlayer(player, '北')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向北走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('北边没有路。可用: ' + exits); } break;
+          if (movePlayer(player, '北')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向北走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('北边没有路。可用: ' + exits)) + '\n>'); } break;
         case 's':
         case 'south':
         case '南':
           if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
-          if (movePlayer(player, '南')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向南走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('南边没有路。可用: ' + exits); } break;
+          if (movePlayer(player, '南')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向南走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('南边没有路。可用: ' + exits)) + '\n>'); } break;
         case 'e':
         case 'east':
         case '东':
           if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
-          if (movePlayer(player, '东')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向东走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('东边没有路。可用: ' + exits); } break;
+          if (movePlayer(player, '东')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向东走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('东边没有路。可用: ' + exits)) + '\n>'); } break;
         case 'w':
         case 'west':
         case '西':
           if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
-          if (movePlayer(player, '西')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向西走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send('西边没有路。可用: ' + exits); } break;
+          if (movePlayer(player, '西')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向西走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('西边没有路。可用: ' + exits)) + '\n>'); } break;
         case 'u':
         case 'up':
         case '上': if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; } player.following = null; if (movePlayer(player, '上')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向上走去')); } else ws.send('上面没有路。'); break;
@@ -3860,10 +3910,12 @@ wss.on('connection', (ws, req) => {
               player.fainted = true;
               player.faintTime = now;
               extraMsg += '\n☠️【醉倒】你只觉天旋地转，眼前一黑，当场醉倒在地。';
+              broadcastRoomAction(player, getPassOutWitnessText(player));
             }
             recalculateDerivedStats(player);
             saveProgress();
             broadcastRoomAction(player, getDrinkWitnessText(player, args, beforeStage, drunkStage));
+            maybeBroadcastDrunkNpcReaction(player);
             ws.send(`你仰头饮下${args}，${drink.desc}${extraMsg}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${drunkStage.label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
             break;
           }
@@ -6148,6 +6200,12 @@ help - 帮助
 });
 
 function movePlayer(player, direction) {
+  const fumble = getDrunkMovementFumble(player);
+  if (fumble) {
+    player.lastMoveFailReason = fumble;
+    return false;
+  }
+  player.lastMoveFailReason = '';
   const room = getRoom(player.room);
   if (room && room.exits[direction]) {
     const oldRoom = player.room;
