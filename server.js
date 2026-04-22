@@ -1960,6 +1960,53 @@ function handleSharedDrink(player, targetName) {
   return 'OK';
 }
 
+function handleToast(player, targetName) {
+  const roomPlayers = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
+  const target = roomPlayers.find(p => p.name === targetName);
+  if (!target) return 'NO_TARGET';
+  broadcastRoomAction(player, `${player.name}拎起酒盏，朝${target.name}遥遥一举，笑道：「这一杯，敬你。」两人杯盏轻碰，发出一声清响。`);
+  if (onlinePlayers[target.name]) {
+    onlinePlayers[target.name].send(`【敬酒】${player.name}举杯向你示意，酒意与人情一并送到了眼前。\n>`);
+  }
+  return 'OK';
+}
+
+function maybeBroadcastTavernAmbient(player, action = 'drink') {
+  const room = getRoom(player.room);
+  if (!room) return;
+  const tavernLike = ['客栈', '江湖客栈大厅', '凤栖城·迎风客栈', '丽春院'].includes(player.room);
+  if (!tavernLike) return;
+  const candidates = [];
+  if ((room.npcs || []).includes('江湖客')) {
+    candidates.push(
+      '角落里的江湖客斜倚长凳，笑着拍桌道：「痛快，喝酒就该有点喝酒的样子！」',
+      '一名江湖客晃着酒碗，懒洋洋地插话道：「今夜这酒气够足，倒像是有故事可听。」'
+    );
+  }
+  if ((room.npcs || []).includes('小二') || (room.npcs || []).includes('店小二')) {
+    candidates.push(
+      '店小二肩上搭着白巾，忙不迭地添了句：「热菜马上就来，诸位慢饮，别急！」',
+      '小二抱着酒坛从旁穿过，笑着嚷道：「喝得尽兴些，今夜柜上可还有两坛新酒！」'
+    );
+  }
+  if ((room.npcs || []).includes('老鸨') && action === 'drink') {
+    candidates.push('老鸨捻着手帕，笑吟吟道：「酒一上头，话就容易多，今夜怕是又要听见些新鲜事了。」');
+  }
+  if (!candidates.length || Math.random() > 0.55) return;
+  broadcastRoomAction(player, candidates[Math.floor(Math.random() * candidates.length)]);
+}
+
+function maybeBroadcastTavernRumor(player) {
+  const room = getRoom(player.room);
+  if (!room) return;
+  const rumorNpc = ['老鸨', '客栈老板', '江湖客'].find(name => (room.npcs || []).includes(name));
+  if (!rumorNpc || Math.random() > 0.35) return;
+  const rumor = rumorNpc === '江湖客'
+    ? '江湖客压低嗓门道：「我听说最近城里来了个不留姓名的阔客，白天不见人影，偏爱夜里出门。」'
+    : getRumorText(rumorNpc, '酒后闲谈');
+  broadcastRoomAction(player, rumor);
+}
+
 function getDrunkMovementFumble(player) {
   const stage = getDrunkStage(player);
   if (stage.key === 'wasted' && Math.random() < 0.4) {
@@ -4022,6 +4069,8 @@ wss.on('connection', (ws, req) => {
             broadcastRoomAction(player, getDrinkWitnessText(player, args, beforeStage, drunkStage));
             maybeBroadcastDrunkNpcReaction(player);
             maybeBroadcastDrinkEasterEgg(player, args);
+            maybeBroadcastTavernAmbient(player, 'drink');
+            maybeBroadcastTavernRumor(player);
             ws.send(`你仰头饮下${args}，${drink.selfFlavor || drink.desc}${extraMsg}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${drunkStage.label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
             break;
           }
@@ -4394,7 +4443,24 @@ wss.on('connection', (ws, req) => {
             ws.send('你囊中羞涩，连请一轮酒的钱都凑不出来。\n>');
           } else {
             saveProgress();
+            maybeBroadcastTavernAmbient(player, 'treat');
             ws.send(`你请${args}喝了一轮酒，花了20铜钱。\n>`);
+          }
+          break;
+
+        case 'toast':
+        case '敬酒':
+        case '碰杯':
+          if (!args) {
+            ws.send('用法: 敬酒 玩家名\n>');
+            break;
+          }
+          const toastResult = handleToast(player, args);
+          if (toastResult === 'NO_TARGET') {
+            ws.send('对方不在这里，没法举杯相敬。\n>');
+          } else {
+            maybeBroadcastTavernAmbient(player, 'toast');
+            ws.send(`你朝${args}举杯致意，杯中酒香微漾。\n>`);
           }
           break;
 
@@ -6306,6 +6372,7 @@ inventory/i - 查看包裹
 drink/喝 [酒名] - 饮酒
 say/说 [内容] - 与同房间的人说话
 treat/请酒 [玩家名] - 请同房间玩家喝一轮酒
+toast/敬酒 [玩家名] - 举杯相敬
 fight - 战斗
 guandan - 扬州赌场简化掼蛋
   guandan hint/auto 可获得提示或自动打一手
