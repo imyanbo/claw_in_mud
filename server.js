@@ -1912,6 +1912,31 @@ function maybeBroadcastDrunkNpcReaction(player) {
   if (reaction) broadcastRoomAction(player, reaction);
 }
 
+function getDrinkEasterEgg(npcName, drinkName) {
+  if (npcName === '陆小凤' && ['女儿红', '烧刀子', '猴儿酒'].includes(drinkName)) {
+    return '陆小凤挑眉一笑：「酒倒是好酒，喝归喝，可别误了出手时机。」';
+  }
+  if (npcName === '黄药师' && drinkName === '猴儿酒') {
+    return '黄药师鼻尖微动，淡淡道：「这酒倒还有点山野灵气，没算糟蹋。」';
+  }
+  if ((npcName === '客栈老板' || npcName === '店小二') && ['米酒', '女儿红', '汾酒'].includes(drinkName)) {
+    return `${npcName}笑着招呼道：「这酒配两碟小菜才更对味。」`;
+  }
+  if (npcName === '老鸨' && drinkName === '女儿红') {
+    return '老鸨掩口笑道：「这坛可是院里留的好货，客官倒识货。」';
+  }
+  return '';
+}
+
+function maybeBroadcastDrinkEasterEgg(player, drinkName) {
+  const room = getRoom(player.room);
+  if (!room) return;
+  const npcName = (room.npcs || []).find(name => getDrinkEasterEgg(name, drinkName));
+  if (!npcName) return;
+  const text = getDrinkEasterEgg(npcName, drinkName);
+  if (text) broadcastRoomAction(player, text);
+}
+
 function getDrunkMovementFumble(player) {
   const stage = getDrunkStage(player);
   if (stage.key === 'wasted' && Math.random() < 0.4) {
@@ -1933,6 +1958,25 @@ function getDrunkSpeechPrefix(player) {
   if (stage.key === 'drunk') return '你带着浓浓酒意，声音发飘地';
   if (stage.key === 'tipsy') return '你面带酒红，笑着';
   return '你';
+}
+
+function transformDrunkSpeech(player, text) {
+  const msg = (text || '').trim();
+  if (!msg) return msg;
+  const stage = getDrunkStage(player);
+  if (stage.key === 'wasted') {
+    return msg
+      .replace(/你/g, '泥')
+      .replace(/我/g, '窝')
+      .replace(/不/g, '唔') + '……';
+  }
+  if (stage.key === 'drunk') {
+    return `${msg}${/[。！？!?~]$/.test(msg) ? '' : '……'}`;
+  }
+  if (stage.key === 'tipsy') {
+    return `${msg} 哈。`;
+  }
+  return msg;
 }
 
 function getDrunkWakeEffect(player) {
@@ -3945,6 +3989,7 @@ wss.on('connection', (ws, req) => {
             saveProgress();
             broadcastRoomAction(player, getDrinkWitnessText(player, args, beforeStage, drunkStage));
             maybeBroadcastDrunkNpcReaction(player);
+            maybeBroadcastDrinkEasterEgg(player, args);
             ws.send(`你仰头饮下${args}，${drink.selfFlavor || drink.desc}${extraMsg}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${drunkStage.label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
             break;
           }
@@ -4299,10 +4344,7 @@ wss.on('connection', (ws, req) => {
             shopMsg += '\n输入 buy [防具名] 购买\n';
           } else {
             shopMsg += '金创药: 20金 恢复50HP\n九转灵丹: 50金 恢复100HP\n内力丹: 30金 恢复30MP\n';
-            for (const [name, item] of Object.entries(drinkItems)) {
-              shopMsg += `${name}: ${item.price}铜钱 ${item.desc}\n`;
-            }
-            shopMsg += '\n输入 buy [物品名] 购买，drink [酒名] 饮用\n';
+            shopMsg += '\n酒水请向客栈老板、老鸨等人物购买，输入 list 客栈老板 或 list 老鸨 查看。\n';
           }
           ws.send(shopMsg + '\n>');
           break;
@@ -5336,8 +5378,9 @@ wss.on('connection', (ws, req) => {
           } else if (tellTarget === player.name) {
             ws.send('不能对自己说话。\n>');
           } else {
-            onlinePlayers[tellTarget].send(`【私信】${player.name}对你说: ${tellMsg}\n>`);
-            ws.send(`【私信】你对【${tellTarget}】说: ${tellMsg}\n>`);
+            const finalTellMsg = transformDrunkSpeech(player, tellMsg);
+            onlinePlayers[tellTarget].send(`【私信】${player.name}对你说: ${finalTellMsg}\n>`);
+            ws.send(`【私信】你对【${tellTarget}】说: ${finalTellMsg}\n>`);
           }
           break;
 
@@ -5375,8 +5418,9 @@ wss.on('connection', (ws, req) => {
           } else if (atTarget === player.name) {
             ws.send('不能对自己说话。\n>');
           } else {
-            onlinePlayers[atTarget].send(`【私信】${player.name}对你说: ${atMsg}\n>`);
-            ws.send(`【私信】你对【${atTarget}】说: ${atMsg}\n>`);
+            const finalAtMsg = transformDrunkSpeech(player, atMsg);
+            onlinePlayers[atTarget].send(`【私信】${player.name}对你说: ${finalAtMsg}\n>`);
+            ws.send(`【私信】你对【${atTarget}】说: ${finalAtMsg}\n>`);
           }
           break;
 
