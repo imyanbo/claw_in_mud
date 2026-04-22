@@ -2007,6 +2007,61 @@ function maybeBroadcastTavernRumor(player) {
   broadcastRoomAction(player, rumor);
 }
 
+function ensureTavernIntelState(player) {
+  player.questProgress = player.questProgress || {};
+  if (!player.questProgress.tavernIntel) {
+    player.questProgress.tavernIntel = {
+      drinks: 0,
+      snippets: [],
+      lastSource: null,
+      intelLevel: 0,
+      cashedToday: 0
+    };
+  }
+  return player.questProgress.tavernIntel;
+}
+
+function getTavernIntelSnippet(player) {
+  const room = getRoom(player.room);
+  if (!room) return null;
+  const source = ['老鸨', '客栈老板', '江湖客', '情报贩子'].find(name => (room.npcs || []).includes(name));
+  if (!source) return null;
+  const pool = {
+    '老鸨': [
+      '你听见老鸨提到，最近总有人在黄昏后问起“白伞客”的落脚处。',
+      '老鸨轻描淡写地说，有个外地阔客包了两夜上房，却从不点灯。'
+    ],
+    '客栈老板': [
+      '客栈老板无意间抱怨，最近有位客人每天半夜才回房，靴底却干净得很。',
+      '掌柜拨算盘时提到，有人专门挑靠后院的房间，像是在等接头。'
+    ],
+    '江湖客': [
+      '邻桌江湖客低声说，东郊驿道这几天多了几匹没人认得的快马。',
+      '有人喝高了拍桌说，听雨楼近来收风声的价码突然翻了一倍。'
+    ],
+    '情报贩子': [
+      '情报贩子鼻子里哼了一声，说城里那批生面孔不像买卖人，倒像踩点的。',
+      '情报贩子故意露了半句，说凤栖城来的信使这两天往返得太勤了。'
+    ]
+  };
+  const text = pool[source][Math.floor(Math.random() * pool[source].length)];
+  return { source, text };
+}
+
+function maybeGrantTavernIntel(player) {
+  const state = ensureTavernIntelState(player);
+  state.drinks += 1;
+  if (state.drinks < 2) return null;
+  if (Math.random() > 0.65) return null;
+  const snippet = getTavernIntelSnippet(player);
+  if (!snippet) return null;
+  if (state.snippets.includes(snippet.text)) return null;
+  state.snippets.push(snippet.text);
+  state.lastSource = snippet.source;
+  state.intelLevel = state.snippets.length;
+  return snippet;
+}
+
 function getDrunkMovementFumble(player) {
   const stage = getDrunkStage(player);
   if (stage.key === 'wasted' && Math.random() < 0.4) {
@@ -4071,7 +4126,9 @@ wss.on('connection', (ws, req) => {
             maybeBroadcastDrinkEasterEgg(player, args);
             maybeBroadcastTavernAmbient(player, 'drink');
             maybeBroadcastTavernRumor(player);
-            ws.send(`你仰头饮下${args}，${drink.selfFlavor || drink.desc}${extraMsg}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${drunkStage.label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
+            const tavernIntel = maybeGrantTavernIntel(player);
+            const intelMsg = tavernIntel ? `\n🕯️【酒肆风声】${tavernIntel.text}` : '';
+            ws.send(`你仰头饮下${args}，${drink.selfFlavor || drink.desc}${extraMsg}${intelMsg}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${drunkStage.label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
             break;
           }
           if (args === 'drug' || args === '金创药') {
@@ -4648,6 +4705,37 @@ wss.on('connection', (ws, req) => {
             break;
           }
           ws.send(`你凑近${formatNpcName(rumorNpc)}，想听些风声。\n${getRumorText(rumorNpc)}\n>`);
+          break;
+
+        case 'intel':
+        case '风声':
+        case '酒肆风声':
+          const intelState = ensureTavernIntelState(player);
+          if (!intelState.snippets.length) {
+            ws.send('你近来还没在酒局中听到什么像样的风声。多喝几轮、多坐一会儿再说。\n>');
+            break;
+          }
+          ws.send(`【酒肆风声】\n${intelState.snippets.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n当前风声层数: ${intelState.intelLevel}\n>`);
+          break;
+
+        case 'cashintel':
+        case '兑风声':
+          const cashState = ensureTavernIntelState(player);
+          if (cashState.snippets.length < 2) {
+            ws.send('你手里的风声还太零碎，至少攒够两条再去找人换消息。\n>');
+            break;
+          }
+          const rewardCoin = 12 + cashState.snippets.length * 6;
+          const rewardExp = 4 + cashState.snippets.length * 3;
+          player.coin += rewardCoin;
+          player.exp += rewardExp;
+          const sourceName = cashState.lastSource || '酒客';
+          cashState.snippets = [];
+          cashState.intelLevel = 0;
+          cashState.drinks = 0;
+          cashState.lastSource = null;
+          saveProgress();
+          ws.send(`你把这几条酒局里听来的风声反复一拼，越想越觉得有门道，便转手换成了人情与小利。\n来源: ${sourceName}\n收获: 铜钱+${rewardCoin} 经验+${rewardExp}\n>`);
           break;
 
         case 'inquire':
@@ -6373,6 +6461,8 @@ drink/喝 [酒名] - 饮酒
 say/说 [内容] - 与同房间的人说话
 treat/请酒 [玩家名] - 请同房间玩家喝一轮酒
 toast/敬酒 [玩家名] - 举杯相敬
+intel/风声 - 查看酒局里听到的风声
+cashintel/兑风声 - 把风声换成收益
 fight - 战斗
 guandan - 扬州赌场简化掼蛋
   guandan hint/auto 可获得提示或自动打一手
