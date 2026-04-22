@@ -3052,8 +3052,12 @@ wss.on('connection', (ws, req) => {
       if (now >= Number(player.meditationEndTime || 0)) {
         player.meditating = false;
         player.meditationEndTime = 0;
+        if (users[player.name]) {
+          users[player.name].meditating = false;
+          users[player.name].meditationEndTime = 0;
+          db.saveUser(player.name, player);
+        }
         ws.send('你缓缓睁开双眼，长长吐出一口浊气，起身而立。方才内息已沿周天运转一遍，丹田之中似乎又丰盈了几分。\n>');
-        saveProgress();
         return;
       }
       ws.send('你正盘膝入定，真气尚在经脉间流转，暂时不能起身行动。\n>');
