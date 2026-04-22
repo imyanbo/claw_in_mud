@@ -2081,6 +2081,24 @@ function consumeIntelAftermathBroadcast(player) {
   return '';
 }
 
+function getRoomAftermathEvent(player) {
+  const aftermath = player.questProgress?.intelAftermath;
+  if (!aftermath?.lastSoldTo) return '';
+  if (aftermath.lastSoldTo === '六扇门捕头' && ['扬州街北', '扬州街中', '扬州街南', '扬州城门'].includes(player.room)) {
+    return '你注意到街边官兵来回巡望，比往日更留心行人面色，像是在暗中核对谁的来路。';
+  }
+  if (aftermath.lastSoldTo === '情报贩子' && ['暗巷', '听雨楼', '凤栖城·迎风客栈'].includes(player.room)) {
+    return '角落里几个人说话的声音压得更低了，递消息的动作却比平时频繁，像是黑市风声又活络了起来。';
+  }
+  if (aftermath.lastSoldTo === '老鸨' && ['丽春院', '扬州小巷', '客栈'].includes(player.room)) {
+    return '你隐约觉得周围人递眼色的次数多了，像是有人故意把几句半真半假的话往外送。';
+  }
+  if (aftermath.lastSoldTo === '客栈老板' && ['客栈', '客房', '江湖客栈大厅'].includes(player.room)) {
+    return '柜台后的目光明显比往日更谨慎，连楼梯口的脚步声都像被人默默记在心里。';
+  }
+  return '';
+}
+
 function sellIntelToNpc(player, npcName) {
   const state = ensureTavernIntelState(player);
   if (state.snippets.length < 2) return { ok: false, message: '你手里的风声还太零碎，至少攒够两条再去找人换消息。' };
@@ -3346,6 +3364,8 @@ function formatOutputBrief(player, message) {
   let output = `\n=== ${message} ===\n\n`;
   const aftermathMsg = consumeIntelAftermathBroadcast(player);
   if (aftermathMsg) output += `${aftermathMsg}\n\n`;
+  const roomAftermath = getRoomAftermathEvent(player);
+  if (roomAftermath) output += `${roomAftermath}\n\n`;
   const room = getRoom(player.room);
   if (room) {
     output += room.description + getCorpseSummary(player.room) + '\n';
@@ -3372,6 +3392,8 @@ function formatOutput(player, message) {
   let output = `\n=== ${message} ===\n\n`;
   const aftermathMsg = consumeIntelAftermathBroadcast(player);
   if (aftermathMsg) output += `${aftermathMsg}\n\n`;
+  const roomAftermath = getRoomAftermathEvent(player);
+  if (roomAftermath) output += `${roomAftermath}\n\n`;
   const room = getRoom(player.room);
   if (room) {
     output += room.description + getCorpseSummary(player.room) + '\n';
@@ -3395,7 +3417,7 @@ function formatOutput(player, message) {
   output += `攻击:${player.外功攻击} 防御:${player.防御} 身法:${player.身法}\n`;
   output += `经验:${player.exp} 铜钱:${player.coin}\n`;
   output += `修炼境界:${getCultivationRealm(player)} 主修内功:${getPrimaryInnerSkill(player).name}\n`;
-  output += `酒意:${getDrunkStage(player).label} (${Math.max(0, Math.floor(player.drunk || 0))}/100)\n`;
+  if (Number(player.drunk || 0) > 0) output += `酒意:${getDrunkStage(player).label} (${Math.max(0, Math.floor(player.drunk || 0))}/100)\n`;
   if (player.weapon || player.armor) {
     output += `装备: ${player.weapon || '无'}(攻+${weaponDmg}) ${player.armor || '无'}(防+${armorDef})\n`;
   }
@@ -3490,7 +3512,7 @@ wss.on('connection', (ws, req) => {
         } else {
           wakeMsg = '一觉醒来，你感觉腰酸背痛';
         }
-        ws.send(wakeMsg + `。${drunkWakeMsg ? `\n${drunkWakeMsg}` : ''}\n【当前】HP: ` + player.hp + '/' + player.maxHp + ` MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${getDrunkStage(player).label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
+        ws.send(wakeMsg + `。${drunkWakeMsg ? `\n${drunkWakeMsg}` : ''}\n【当前】HP: ` + player.hp + '/' + player.maxHp + ` MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli}${Number(player.drunk || 0) > 0 ? ` 酒意:${getDrunkStage(player).label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)` : ''}\n>`);
         saveProgress();
         return;
       } else {
@@ -4212,7 +4234,7 @@ wss.on('connection', (ws, req) => {
             maybeBroadcastTavernRumor(player);
             const tavernIntel = maybeGrantTavernIntel(player);
             const intelMsg = tavernIntel ? `\n🕯️【酒肆风声】${tavernIntel.text}` : '';
-            ws.send(`你仰头饮下${args}，${drink.selfFlavor || drink.desc}${extraMsg}${intelMsg}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${drunkStage.label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
+            ws.send(`你仰头饮下${args}，${drink.selfFlavor || drink.desc}${extraMsg}${intelMsg}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli}${Number(player.drunk || 0) > 0 ? ` 酒意:${drunkStage.label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)` : ''}\n>`);
             break;
           }
           if (args === 'drug' || args === '金创药') {
@@ -5796,8 +5818,8 @@ wss.on('connection', (ws, req) => {
 ╠══════════════════════════════════════╣
 ║ 【战斗衍生】                                ║
 ║ 命中: ${player.命中}%  闪避: ${player.闪避}%  暴击: ${player.暴击}%     ║
-║ 酒意: ${getDrunkStage(player).label} (${Math.max(0, Math.floor(player.drunk || 0))}/100)                 ║
-║ 击杀: ${player.pvpKills || 0}  死亡: ${player.deaths || 0}                ║
+${Number(player.drunk || 0) > 0 ? `║ 酒意: ${getDrunkStage(player).label} (${Math.max(0, Math.floor(player.drunk || 0))}/100)                 ║
+` : ''}║ 击杀: ${player.pvpKills || 0}  死亡: ${player.deaths || 0}                ║
 ╠══════════════════════════════════════╣
 ║ 经验: ${player.exp}                                  ║
 ╚══════════════════════════════════════╝
