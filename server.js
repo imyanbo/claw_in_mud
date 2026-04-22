@@ -1944,9 +1944,19 @@ function maybeBroadcastDrinkEasterEgg(player, drinkName) {
 }
 
 function handleSharedDrink(player, targetName) {
+  const room = getRoom(player.room);
   const roomPlayers = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
   const target = roomPlayers.find(p => p.name === targetName);
-  if (!target) return 'NO_TARGET';
+  if (!target) {
+    const npcName = resolveNpcName(targetName, room);
+    if (!npcName) return 'NO_TARGET';
+    if (player.coin < 20) return 'NO_MONEY';
+    player.coin -= 20;
+    const npcMeta = getNpcMeta(npcName);
+    broadcastRoomAction(player, `${player.name}招呼店家温了一壶酒，笑着请${npcName}共饮。${npcName}${npcMeta.role ? `这位${npcMeta.role}` : ''}接过酒盏，神色似乎松快了几分。`);
+    if (importantNpcNames.has(npcName)) noteNpcInteraction(npcName, player, 'gift');
+    return { ok: true, targetType: 'npc', targetName: npcName, message: `${npcName}接过酒盏，${npcName === '六扇门捕头' ? '只略略抿了一口，神色却没先前那么冷了。' : npcName === '老鸨' ? '掩口轻笑，像是把你记得更清了。' : npcName === '情报贩子' ? '眼里闪过一丝不易察觉的兴趣。' : '神情和缓了些。'}` };
+  }
   if (player.coin < 20) return 'NO_MONEY';
   player.coin -= 20;
   target.jingli = Math.min(target.maxJingli ?? 100, (target.jingli ?? 100) + 8);
@@ -1957,7 +1967,7 @@ function handleSharedDrink(player, targetName) {
   if (onlinePlayers[target.name]) {
     onlinePlayers[target.name].send(`【共饮】${player.name}请你喝了一轮酒。你抿了几口，只觉胸口微暖，酒意略起。\n>`);
   }
-  return 'OK';
+  return { ok: true, targetType: 'player', targetName: target.name, message: `${target.name}接过酒盏，与你对饮了几口。` };
 }
 
 function handleToast(player, targetName) {
@@ -4607,7 +4617,7 @@ wss.on('connection', (ws, req) => {
           } else {
             saveProgress();
             maybeBroadcastTavernAmbient(player, 'treat');
-            ws.send(`你请${args}喝了一轮酒，花了20铜钱。\n>`);
+            ws.send(`你请${treatResult.targetName}喝了一轮酒，花了20铜钱。\n${treatResult.message}\n>`);
           }
           break;
 
