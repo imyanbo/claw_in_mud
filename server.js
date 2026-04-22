@@ -3365,6 +3365,11 @@ wss.on('connection', (ws, req) => {
             命中: player.命中,
             闪避: player.闪避,
             暴击: player.暴击,
+            maxMpBonus: player.maxMpBonus,
+            maxHpBonus: player.maxHpBonus,
+            lastMeditationAt: player.lastMeditationAt,
+            meditating: player.meditating,
+            meditationEndTime: player.meditationEndTime,
             // 门派声望
             门派声望: player.门派声望,
             pvpKills: player.pvpKills,

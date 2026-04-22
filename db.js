@@ -66,6 +66,13 @@ function initDatabase() {
       命中 INTEGER,
       闪避 INTEGER,
       暴击 INTEGER,
+      jingli INTEGER,
+      maxJingli INTEGER,
+      maxMpBonus INTEGER DEFAULT 0,
+      maxHpBonus INTEGER DEFAULT 0,
+      lastMeditationAt INTEGER DEFAULT 0,
+      meditating INTEGER DEFAULT 0,
+      meditationEndTime INTEGER DEFAULT 0,
       门派声望 INTEGER DEFAULT 0,
       观测数据 INTEGER DEFAULT 0,
       信号已解码 INTEGER DEFAULT 0,
@@ -106,7 +113,24 @@ function initDatabase() {
 
     CREATE INDEX IF NOT EXISTS idx_online_presence_instance_id ON online_presence(instance_id);
     CREATE INDEX IF NOT EXISTS idx_online_presence_last_seen_at ON online_presence(last_seen_at);
+
   `);
+
+  const existingColumns = new Set(db.prepare("PRAGMA table_info(users)").all().map(col => col.name));
+  const ensureColumn = (name, sql) => {
+    if (!existingColumns.has(name)) {
+      db.exec(`ALTER TABLE users ADD COLUMN ${sql}`);
+      existingColumns.add(name);
+    }
+  };
+
+  ensureColumn('jingli', 'jingli INTEGER');
+  ensureColumn('maxJingli', 'maxJingli INTEGER');
+  ensureColumn('maxMpBonus', 'maxMpBonus INTEGER DEFAULT 0');
+  ensureColumn('maxHpBonus', 'maxHpBonus INTEGER DEFAULT 0');
+  ensureColumn('lastMeditationAt', 'lastMeditationAt INTEGER DEFAULT 0');
+  ensureColumn('meditating', 'meditating INTEGER DEFAULT 0');
+  ensureColumn('meditationEndTime', 'meditationEndTime INTEGER DEFAULT 0');
 }
 
 function rowToUser(row) {
@@ -119,6 +143,7 @@ function rowToUser(row) {
     questProgress: deserialize(row.questProgress, {}),
     achievements: deserialize(row.achievements, []),
     先天: deserialize(row.先天, {}),
+    meditating: !!row.meditating,
     观测数据: !!row.观测数据,
     信号已解码: !!row.信号已解码,
     已触发新港城剧情: !!row.已触发新港城剧情
@@ -139,13 +164,17 @@ function saveUser(user) {
       name, password, exp, level, gold, hp, mp, maxHp, maxMp, room,
       skills, inventory, weapon, armor, title, follows, master, school,
       quest, questProgress, achievements, 先天,
-      气血, 内力, 外功攻击, 内功攻击, 防御, 身法, 命中, 闪避, 暴击, 门派声望,
+      气血, 内力, 外功攻击, 内功攻击, 防御, 身法, 命中, 闪避, 暴击,
+      jingli, maxJingli, maxMpBonus, maxHpBonus, lastMeditationAt, meditating, meditationEndTime,
+      门派声望,
       观测数据, 信号已解码, 已触发新港城剧情, faction, updatedAt
     ) VALUES (
       @name, @password, @exp, @level, @gold, @hp, @mp, @maxHp, @maxMp, @room,
       @skills, @inventory, @weapon, @armor, @title, @follows, @master, @school,
       @quest, @questProgress, @achievements, @先天,
-      @气血, @内力, @外功攻击, @内功攻击, @防御, @身法, @命中, @闪避, @暴击, @门派声望,
+      @气血, @内力, @外功攻击, @内功攻击, @防御, @身法, @命中, @闪避, @暴击,
+      @jingli, @maxJingli, @maxMpBonus, @maxHpBonus, @lastMeditationAt, @meditating, @meditationEndTime,
+      @门派声望,
       @观测数据, @信号已解码, @已触发新港城剧情, @faction, @updatedAt
     )
     ON CONFLICT(name) DO UPDATE SET
@@ -179,6 +208,13 @@ function saveUser(user) {
       命中=excluded.命中,
       闪避=excluded.闪避,
       暴击=excluded.暴击,
+      jingli=excluded.jingli,
+      maxJingli=excluded.maxJingli,
+      maxMpBonus=excluded.maxMpBonus,
+      maxHpBonus=excluded.maxHpBonus,
+      lastMeditationAt=excluded.lastMeditationAt,
+      meditating=excluded.meditating,
+      meditationEndTime=excluded.meditationEndTime,
       门派声望=excluded.门派声望,
       观测数据=excluded.观测数据,
       信号已解码=excluded.信号已解码,
@@ -219,6 +255,13 @@ function saveUser(user) {
     命中: user.命中 ?? 80,
     闪避: user.闪避 ?? 10,
     暴击: user.暴击 ?? 5,
+    jingli: user.jingli ?? user.maxJingli ?? 100,
+    maxJingli: user.maxJingli ?? 100,
+    maxMpBonus: user.maxMpBonus ?? 0,
+    maxHpBonus: user.maxHpBonus ?? 0,
+    lastMeditationAt: user.lastMeditationAt ?? 0,
+    meditating: user.meditating ? 1 : 0,
+    meditationEndTime: user.meditationEndTime ?? 0,
     门派声望: user.门派声望 ?? 0,
     观测数据: user.观测数据 ? 1 : 0,
     信号已解码: user.信号已解码 ? 1 : 0,
