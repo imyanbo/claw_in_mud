@@ -1943,6 +1943,37 @@ function maybeBroadcastDrinkEasterEgg(player, drinkName) {
   if (text) broadcastRoomAction(player, text);
 }
 
+function getNpcTreatReaction(npcName) {
+  if (npcName === '六扇门捕头') {
+    return {
+      roomText: '六扇门捕头接过酒盏，只沾了沾唇，便把酒放在手边，神色却比先前缓和了半分。',
+      selfText: '六扇门捕头只略略抿了一口，沉声道：「酒我领了，人情也记下，但城里的规矩不能坏。」'
+    };
+  }
+  if (npcName === '老鸨') {
+    return {
+      roomText: '老鸨掩口轻笑，纤手托着酒盏浅浅抿了一口，眼波流转间像是把你的名字记进了心里。',
+      selfText: '老鸨眯眼笑道：「客官这杯酒，我可收下了。以后若有好风声，说不定先给你留一句。」'
+    };
+  }
+  if (npcName === '情报贩子') {
+    return {
+      roomText: '情报贩子接过酒盏，先低头闻了闻，才慢慢饮下一口，眼底多了几分不易察觉的兴趣。',
+      selfText: '情报贩子低声道：「酒倒不差。肯请这一杯，说明你多少懂点规矩。」'
+    };
+  }
+  if (npcName === '客栈老板' || npcName === '店小二') {
+    return {
+      roomText: `${npcName}笑着接过酒盏，熟练地陪了一口，顺手还替你把桌上的酒菜摆得更顺了些。`,
+      selfText: `${npcName}笑道：「这杯酒喝得暖心，往后来店里，我记你个熟面孔。」`
+    };
+  }
+  return {
+    roomText: `${npcName}接过酒盏，神情和缓了些。`,
+    selfText: `${npcName}接过酒盏，朝你略一点头。`
+  };
+}
+
 function handleSharedDrink(player, targetName) {
   const room = getRoom(player.room);
   const roomPlayers = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
@@ -1953,9 +1984,10 @@ function handleSharedDrink(player, targetName) {
     if (player.coin < 20) return 'NO_MONEY';
     player.coin -= 20;
     const npcMeta = getNpcMeta(npcName);
-    broadcastRoomAction(player, `${player.name}招呼店家温了一壶酒，笑着请${npcName}共饮。${npcName}${npcMeta.role ? `这位${npcMeta.role}` : ''}接过酒盏，神色似乎松快了几分。`);
+    const reaction = getNpcTreatReaction(npcName);
+    broadcastRoomAction(player, `${player.name}招呼店家温了一壶酒，笑着请${npcName}共饮。${reaction.roomText}`);
     if (importantNpcNames.has(npcName)) noteNpcInteraction(npcName, player, 'gift');
-    return { ok: true, targetType: 'npc', targetName: npcName, message: `${npcName}接过酒盏，${npcName === '六扇门捕头' ? '只略略抿了一口，神色却没先前那么冷了。' : npcName === '老鸨' ? '掩口轻笑，像是把你记得更清了。' : npcName === '情报贩子' ? '眼里闪过一丝不易察觉的兴趣。' : '神情和缓了些。'}` };
+    return { ok: true, targetType: 'npc', targetName: npcName, message: reaction.selfText };
   }
   if (player.coin < 20) return 'NO_MONEY';
   player.coin -= 20;
