@@ -2062,6 +2062,61 @@ function maybeGrantTavernIntel(player) {
   return snippet;
 }
 
+function sellIntelToNpc(player, npcName) {
+  const state = ensureTavernIntelState(player);
+  if (state.snippets.length < 2) return { ok: false, message: '你手里的风声还太零碎，至少攒够两条再去找人换消息。' };
+  const relation = getNpcPlayerState(npcName, player.name);
+  const snippetCount = state.snippets.length;
+  let reward = { coin: 0, exp: 0, trust: 0, favor: 0, suspicion: 0, text: '' };
+
+  if (npcName === '情报贩子') {
+    reward = {
+      coin: 20 + snippetCount * 10,
+      exp: 3 + snippetCount * 2,
+      trust: 1,
+      text: `情报贩子把你递过去的零碎风声拼了拼，眯眼笑道：「不错，这几句能卖两手。」`
+    };
+  } else if (npcName === '老鸨') {
+    reward = {
+      coin: 10 + snippetCount * 5,
+      exp: 5 + snippetCount * 3,
+      favor: 2,
+      text: `老鸨用团扇掩唇轻笑：「倒是会听。这样的风声，留在我这儿比落到旁人耳里值钱。」`
+    };
+  } else if (npcName === '六扇门捕头') {
+    reward = {
+      coin: 6 + snippetCount * 3,
+      exp: 8 + snippetCount * 4,
+      trust: 2,
+      suspicion: -1,
+      text: `六扇门捕头听完后神色微沉，点头道：「这些话不算白听。你这次算是帮上忙了。」`
+    };
+  } else if (npcName === '客栈老板') {
+    reward = {
+      coin: 14 + snippetCount * 4,
+      exp: 4 + snippetCount * 2,
+      favor: 1,
+      text: `客栈老板拨了拨算盘，压低声音道：「这些风声我记下了。以后若再有住店异样，我也会给你留一耳朵。」`
+    };
+  } else {
+    return { ok: false, message: '这人看起来对酒局风声并不感兴趣。' };
+  }
+
+  player.coin += reward.coin;
+  player.exp += reward.exp;
+  relation.trust = Math.max(0, (relation.trust || 0) + reward.trust);
+  relation.favor = Math.max(0, (relation.favor || 0) + reward.favor);
+  relation.suspicion = Math.max(0, (relation.suspicion || 0) + reward.suspicion);
+  state.snippets = [];
+  state.intelLevel = 0;
+  state.drinks = 0;
+  state.lastSource = npcName;
+  return {
+    ok: true,
+    message: `${reward.text}\n收获: 铜钱+${reward.coin} 经验+${reward.exp}${reward.trust ? ` 信任+${reward.trust}` : ''}${reward.favor ? ` 好感+${reward.favor}` : ''}${reward.suspicion < 0 ? ` 疑心${reward.suspicion}` : ''}`
+  };
+}
+
 function getDrunkMovementFumble(player) {
   const stage = getDrunkStage(player);
   if (stage.key === 'wasted' && Math.random() < 0.4) {
@@ -4738,6 +4793,27 @@ wss.on('connection', (ws, req) => {
           ws.send(`你把这几条酒局里听来的风声反复一拼，越想越觉得有门道，便转手换成了人情与小利。\n来源: ${sourceName}\n收获: 铜钱+${rewardCoin} 经验+${rewardExp}\n>`);
           break;
 
+        case 'sellintel':
+        case '卖风声':
+          if (!args) {
+            ws.send('用法: 卖风声 NPC名，例如 卖风声 情报贩子\n>');
+            break;
+          }
+          const intelNpc = resolveNpcName(args, getRoom(player.room));
+          if (!intelNpc) {
+            ws.send('这里没有这个人可收风声。\n>');
+            break;
+          }
+          const sellResult = sellIntelToNpc(player, intelNpc);
+          if (!sellResult.ok) {
+            ws.send(sellResult.message + '\n>');
+            break;
+          }
+          noteNpcInteraction(intelNpc, player, 'gift');
+          saveProgress();
+          ws.send(`你把酒局里拼出的风声低声卖给了${intelNpc}。\n${sellResult.message}\n>`);
+          break;
+
         case 'inquire':
         case '打听':
           if (!args) {
@@ -6463,6 +6539,7 @@ treat/请酒 [玩家名] - 请同房间玩家喝一轮酒
 toast/敬酒 [玩家名] - 举杯相敬
 intel/风声 - 查看酒局里听到的风声
 cashintel/兑风声 - 把风声换成收益
+sellintel/卖风声 [NPC] - 把风声卖给指定人物
 fight - 战斗
 guandan - 扬州赌场简化掼蛋
   guandan hint/auto 可获得提示或自动打一手
