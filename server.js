@@ -1943,29 +1943,30 @@ function maybeBroadcastDrinkEasterEgg(player, drinkName) {
   if (text) broadcastRoomAction(player, text);
 }
 
-function getNpcTreatReaction(npcName) {
+function getNpcTreatReaction(npcName, relation = {}) {
+  const familiar = (relation.favor || 0) >= 3 || (relation.trust || 0) >= 3;
   if (npcName === '六扇门捕头') {
     return {
-      roomText: '六扇门捕头接过酒盏，只沾了沾唇，便把酒放在手边，神色却比先前缓和了半分。',
-      selfText: '六扇门捕头只略略抿了一口，沉声道：「酒我领了，人情也记下，但城里的规矩不能坏。」'
+      roomText: familiar ? '六扇门捕头接过酒盏，难得多饮了半口，眉宇间那点冷意明显松开了些。' : '六扇门捕头接过酒盏，只沾了沾唇，便把酒放在手边，神色却比先前缓和了半分。',
+      selfText: familiar ? '六扇门捕头低声道：「你这杯酒，我记着。往后若真有要紧风声，可以直接来找我。」' : '六扇门捕头只略略抿了一口，沉声道：「酒我领了，人情也记下，但城里的规矩不能坏。」'
     };
   }
   if (npcName === '老鸨') {
     return {
-      roomText: '老鸨掩口轻笑，纤手托着酒盏浅浅抿了一口，眼波流转间像是把你的名字记进了心里。',
-      selfText: '老鸨眯眼笑道：「客官这杯酒，我可收下了。以后若有好风声，说不定先给你留一句。」'
+      roomText: familiar ? '老鸨笑得越发亲热，酒盏在指尖一转，连看你的眼神都像多了几分偏袒。' : '老鸨掩口轻笑，纤手托着酒盏浅浅抿了一口，眼波流转间像是把你的名字记进了心里。',
+      selfText: familiar ? '老鸨眯眼笑道：「熟客请的酒，味道就是不一样。今夜若有真风声，我先替你留着。」' : '老鸨眯眼笑道：「客官这杯酒，我可收下了。以后若有好风声，说不定先给你留一句。」'
     };
   }
   if (npcName === '情报贩子') {
     return {
-      roomText: '情报贩子接过酒盏，先低头闻了闻，才慢慢饮下一口，眼底多了几分不易察觉的兴趣。',
-      selfText: '情报贩子低声道：「酒倒不差。肯请这一杯，说明你多少懂点规矩。」'
+      roomText: familiar ? '情报贩子接酒时几乎没再遮掩，甚至主动把身子往你这边偏了偏，像是默许你靠近了些。' : '情报贩子接过酒盏，先低头闻了闻，才慢慢饮下一口，眼底多了几分不易察觉的兴趣。',
+      selfText: familiar ? '情报贩子低声道：「这杯酒算你有心。下回你若来，我手里真消息先让你挑一句。」' : '情报贩子低声道：「酒倒不差。肯请这一杯，说明你多少懂点规矩。」'
     };
   }
   if (npcName === '客栈老板' || npcName === '店小二') {
     return {
-      roomText: `${npcName}笑着接过酒盏，熟练地陪了一口，顺手还替你把桌上的酒菜摆得更顺了些。`,
-      selfText: `${npcName}笑道：「这杯酒喝得暖心，往后来店里，我记你个熟面孔。」`
+      roomText: familiar ? `${npcName}笑得格外热络，接酒后还特意替你把座位挪得更舒服，俨然把你当半个自己人。` : `${npcName}笑着接过酒盏，熟练地陪了一口，顺手还替你把桌上的酒菜摆得更顺了些。`,
+      selfText: familiar ? `${npcName}笑道：「你这熟客的酒我可不能白喝。往后来店里，有空房和新菜我先替你留着。」` : `${npcName}笑道：「这杯酒喝得暖心，往后来店里，我记你个熟面孔。」`
     };
   }
   return {
@@ -1983,8 +1984,8 @@ function handleSharedDrink(player, targetName) {
     if (!npcName) return 'NO_TARGET';
     if (player.coin < 20) return 'NO_MONEY';
     player.coin -= 20;
-    const npcMeta = getNpcMeta(npcName);
-    const reaction = getNpcTreatReaction(npcName);
+    const relation = getNpcPlayerState(npcName, player.name);
+    const reaction = getNpcTreatReaction(npcName, relation);
     broadcastRoomAction(player, `${player.name}招呼店家温了一壶酒，笑着请${npcName}共饮。${reaction.roomText}`);
     if (importantNpcNames.has(npcName)) noteNpcInteraction(npcName, player, 'gift');
     return { ok: true, targetType: 'npc', targetName: npcName, message: reaction.selfText };
@@ -2003,14 +2004,38 @@ function handleSharedDrink(player, targetName) {
 }
 
 function handleToast(player, targetName) {
+  const room = getRoom(player.room);
   const roomPlayers = Object.values(players).filter(p => p.room === player.room && p.name !== player.name);
   const target = roomPlayers.find(p => p.name === targetName);
-  if (!target) return 'NO_TARGET';
-  broadcastRoomAction(player, `${player.name}拎起酒盏，朝${target.name}遥遥一举，笑道：「这一杯，敬你。」两人杯盏轻碰，发出一声清响。`);
-  if (onlinePlayers[target.name]) {
-    onlinePlayers[target.name].send(`【敬酒】${player.name}举杯向你示意，酒意与人情一并送到了眼前。\n>`);
+  if (target) {
+    broadcastRoomAction(player, `${player.name}拎起酒盏，朝${target.name}遥遥一举，笑道：「这一杯，敬你。」两人杯盏轻碰，发出一声清响。`);
+    if (onlinePlayers[target.name]) {
+      onlinePlayers[target.name].send(`【敬酒】${player.name}举杯向你示意，酒意与人情一并送到了眼前。\n>`);
+    }
+    return { ok: true, targetType: 'player', targetName: target.name, message: `${target.name}抬杯与你轻轻一碰。` };
   }
-  return 'OK';
+  const npcName = resolveNpcName(targetName, room);
+  if (!npcName) return 'NO_TARGET';
+  const relation = getNpcPlayerState(npcName, player.name);
+  const familiar = (relation.favor || 0) >= 3 || (relation.trust || 0) >= 3;
+  let roomText = `${player.name}拎起酒盏，朝${npcName}遥遥一举，笑道：「这一杯，敬你。」${npcName}微微颔首，以杯相应。`;
+  let selfText = `${npcName}朝你略一举杯，算是把这份敬意收下了。`;
+  if (npcName === '六扇门捕头') {
+    roomText = familiar ? `${player.name}朝六扇门捕头敬了一杯。捕头抬盏回敬，动作仍克制，却不再拒人千里。` : `${player.name}朝六扇门捕头敬了一杯。捕头抬盏回了半礼，神色沉稳如旧。`;
+    selfText = familiar ? '六扇门捕头沉声道：「这杯敬意，我收下。你这人，倒还算有分寸。」' : '六扇门捕头点了点头：「心意到了就够，莫要在公门前失了分寸。」';
+  } else if (npcName === '老鸨') {
+    roomText = familiar ? `${player.name}举杯敬向老鸨。老鸨笑盈盈地回了你一盏，场面倒像是你们早有几分默契。` : `${player.name}举杯敬向老鸨。老鸨捻着酒盏轻轻一碰，笑意却先到了眼角。`;
+    selfText = familiar ? '老鸨轻笑道：「这杯酒敬得妙，倒像是专门说给我听的。」' : '老鸨眯眼笑道：「客官会来事，这杯我自然得陪。」';
+  } else if (npcName === '情报贩子') {
+    roomText = familiar ? `${player.name}朝情报贩子举杯。对方竟难得没再藏着掖着，抬盏与你轻轻一碰。` : `${player.name}朝情报贩子举杯。对方略一抬手，以盏示意，仍旧留着几分戒备。`;
+    selfText = familiar ? '情报贩子低声道：「敬酒比问话中听。你这人，慢慢像样了。」' : '情报贩子淡淡道：「杯我碰了，话可未必就多。」';
+  } else if (npcName === '客栈老板' || npcName === '店小二') {
+    roomText = familiar ? `${player.name}朝${npcName}敬了一杯。${npcName}笑呵呵地陪了满盏，连旁边酒客都跟着起了哄。` : `${player.name}朝${npcName}敬了一杯。${npcName}忙中不乱地回敬一口，脸上笑意不减。`;
+    selfText = familiar ? `${npcName}笑道：「这杯酒我陪到底，往后来店里，你尽管开口。」` : `${npcName}笑道：「承情承情，这杯我陪了。」`;
+  }
+  broadcastRoomAction(player, roomText);
+  if (importantNpcNames.has(npcName)) noteNpcInteraction(npcName, player, 'talk');
+  return { ok: true, targetType: 'npc', targetName: npcName, message: selfText };
 }
 
 function maybeBroadcastTavernAmbient(player, action = 'drink') {
@@ -4665,7 +4690,7 @@ wss.on('connection', (ws, req) => {
             ws.send('对方不在这里，没法举杯相敬。\n>');
           } else {
             maybeBroadcastTavernAmbient(player, 'toast');
-            ws.send(`你朝${args}举杯致意，杯中酒香微漾。\n>`);
+            ws.send(`你朝${toastResult.targetName}举杯致意，杯中酒香微漾。\n${toastResult.message}\n>`);
           }
           break;
 
