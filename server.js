@@ -1442,7 +1442,14 @@ function getNpcEntranceStyle(npcName, mode = 'arrival') {
 }
 
 function broadcastRoomDeparture(leaverName, roomName, type = 'player') {
-  const leaveText = type === 'npc' ? `${leaverName}${getNpcEntranceStyle(leaverName, 'departure')}` : `${leaverName}行色匆匆地离开了。`;
+  let leaveText = type === 'npc' ? `${leaverName}${getNpcEntranceStyle(leaverName, 'departure')}` : `${leaverName}行色匆匆地离开了。`;
+  if (type === 'player') {
+    const player = players[leaverName] || users[leaverName];
+    const drunkStage = player ? getDrunkStage(player) : null;
+    if (drunkStage?.key === 'wasted') leaveText = `${leaverName}扶着墙踉踉跄跄地离开了，留下一路淡淡酒气。`;
+    else if (drunkStage?.key === 'drunk') leaveText = `${leaverName}脚下虚浮，摇摇晃晃地离开了。`;
+    else if (drunkStage?.key === 'tipsy') leaveText = `${leaverName}带着几分酒意，慢悠悠地离开了。`;
+  }
   for (const [name, client] of Object.entries(onlinePlayers)) {
     if (name !== leaverName && players[name]?.room === roomName) {
       client.send(`${leaveText}\n>`);
@@ -1834,6 +1841,34 @@ function getActiveDrinkBuff(player, now = Date.now()) {
     return null;
   }
   return player.drinkBuffs;
+}
+
+function broadcastRoomAction(actor, message) {
+  for (const [name, client] of Object.entries(onlinePlayers)) {
+    if (name === actor.name) continue;
+    if (players[name]?.room === actor.room) {
+      client.send(`${message}\n>`);
+    }
+  }
+}
+
+function getDrinkWitnessText(player, drinkName, beforeStage, afterStage) {
+  if (afterStage.key === 'passed_out') {
+    return `${player.name}摇摇晃晃地从怀中摸出一只${drinkName}，仰头猛灌了几口，忽然脚下一软，眼前一黑，竟当场醉倒在地。周围众人见状，纷纷避开了几步。`;
+  }
+  if (afterStage.key === 'wasted') {
+    return `${player.name}摇摇晃晃地从怀中摸出一只${drinkName}，仰头朝嘴里倒去。酒液顺着嘴角淌下，惹得旁人一阵诧异，忙不迭快步离开。`;
+  }
+  if (afterStage.key === 'drunk') {
+    return `${player.name}提起${drinkName}咕咚灌下，脚步已显虚浮，眼神也有些发散。周围人互望一眼，只觉此人酒劲上头了。`;
+  }
+  if (afterStage.key === 'tipsy') {
+    return `${player.name}随手拍开${drinkName}，仰头饮了几口，面上渐渐泛起酒意，说话声也比平时高了几分。`;
+  }
+  if (beforeStage.key === 'sober') {
+    return `${player.name}从怀中摸出一只${drinkName}，仰头饮下，神情间多了几分暖意。`;
+  }
+  return `${player.name}又饮了一口${drinkName}，身上的酒气更重了。`;
 }
 
 function getMoneySummary(player) {
@@ -2919,7 +2954,12 @@ function broadcastRoomArrival(arriver, roomName) {
     if (name === arriver.name) continue;
     const targetPlayer = users[name];
     if (!targetPlayer || targetPlayer.room !== roomName) continue;
-    client.send(`【系统】${formatArrival(arriver.name, arriver.hp, arriver.maxHp)}。\n>`);
+    const drunkStage = getDrunkStage(arriver);
+    let arrivalText = formatArrival(arriver.name, arriver.hp, arriver.maxHp);
+    if (drunkStage.key === 'wasted') arrivalText = `${arriver.name}脚步踉跄地晃了过来，满身酒气，险些撞翻一旁桌椅`;
+    else if (drunkStage.key === 'drunk') arrivalText = `${arriver.name}带着一身酒意走了过来，步伐已有些不稳`;
+    else if (drunkStage.key === 'tipsy') arrivalText = `${arriver.name}面带薄红地走了过来，似乎刚饮过几杯`;
+    client.send(`【系统】${arrivalText}。\n>`);
   }
   tryAutoVendettaCombat(arriver);
   const followers = Object.values(players).filter(p => p.following === arriver.name && p.room !== arriver.room && !p.dead && !p.fainted);
@@ -3790,6 +3830,7 @@ wss.on('connection', (ws, req) => {
               ws.send('你已经醉得不省人事，再灌下去怕是要出事。\n>');
               break;
             }
+            const beforeStage = getDrunkStage(player);
             player.inventory = player.inventory.filter((item, index) => !(item === args && index === player.inventory.indexOf(args)));
             player.hp = Math.min(player.maxHp, player.hp + (drink.hp || 0));
             player.mp = Math.min(player.maxMp, player.mp + (drink.mp || 0));
@@ -3822,6 +3863,7 @@ wss.on('connection', (ws, req) => {
             }
             recalculateDerivedStats(player);
             saveProgress();
+            broadcastRoomAction(player, getDrinkWitnessText(player, args, beforeStage, drunkStage));
             ws.send(`你仰头饮下${args}，${drink.desc}${extraMsg}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${drunkStage.label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
             break;
           }
