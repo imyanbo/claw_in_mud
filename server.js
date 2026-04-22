@@ -186,30 +186,36 @@ const armors = {
 const drinkItems = {
   '米酒': {
     type: '酒', category: '普通酒', price: 12, weight: 1, desc: '温和的米酒，带着淡淡粮香。',
-    hp: 0, mp: 0, jingli: 12, drunkValue: 5, cooldown: 6000
+    hp: 0, mp: 0, jingli: 12, drunkValue: 5, cooldown: 6000,
+    selfFlavor: '酒液温温地下肚，像一股细小暖流从胸腹间慢慢散开。'
   },
   '女儿红': {
     type: '酒', category: '普通酒', price: 30, weight: 1, desc: '陈香绵长，入口微甜。',
-    hp: 12, mp: 8, jingli: 0, drunkValue: 8, cooldown: 8000
+    hp: 12, mp: 8, jingli: 0, drunkValue: 8, cooldown: 8000,
+    selfFlavor: '醇厚酒香在舌尖一滚，喉间暖意绵绵不绝，倒真有几分江湖夜雨的意思。'
   },
   '烧刀子': {
     type: '酒', category: '烈酒', price: 45, weight: 1, desc: '酒性猛烈，入喉如火。',
     hp: 0, mp: 10, jingli: 0, drunkValue: 18, cooldown: 10000,
-    buff: { atk: 4, crit: 3, hit: -3, dodge: -3, durationMs: 180000 }
+    buff: { atk: 4, crit: 3, hit: -3, dodge: -3, durationMs: 180000 },
+    selfFlavor: '这一口烈酒如火线般直贯喉头，烧得你胸腔发热，胆气也随之一壮。'
   },
   '汾酒': {
     type: '酒', category: '雅酒', price: 36, weight: 1, desc: '清冽甘润，后劲却不小。',
     hp: 0, mp: 12, jingli: 0, drunkValue: 10, cooldown: 8000,
-    insightChance: 0.18
+    insightChance: 0.18,
+    selfFlavor: '酒意清冽，初入口时平平，回味却渐渐浮起，连心神都似被洗得澄明了些。'
   },
   '活血药酒': {
     type: '酒', category: '药酒', price: 55, weight: 1, desc: '药香与酒气交织，可活络气血。',
-    hp: 25, mp: 0, jingli: 0, drunkValue: 12, cooldown: 12000
+    hp: 25, mp: 0, jingli: 0, drunkValue: 12, cooldown: 12000,
+    selfFlavor: '药力伴着酒气徐徐化开，你只觉筋骨间的滞涩被冲开了几分。'
   },
   '猴儿酒': {
     type: '酒', category: '珍酒', price: 88, weight: 1, desc: '山中异酿，灵气隐隐。',
     hp: 18, mp: 18, jingli: 0, drunkValue: 10, cooldown: 10000,
-    insightChance: 0.25, expBonus: 5
+    insightChance: 0.25, expBonus: 5,
+    selfFlavor: '甘香入口，竟带着山林清气，仿佛连胸中浊念都被洗去了半分。'
   }
 };
 
@@ -1921,6 +1927,28 @@ function getPassOutWitnessText(player) {
   return `${player.name}眼神一散，身子晃了两晃，随即扑通一声醉倒在地，半晌再无动静。`;
 }
 
+function getDrunkSpeechPrefix(player) {
+  const stage = getDrunkStage(player);
+  if (stage.key === 'wasted') return '你舌头都有些打卷，含含糊糊地';
+  if (stage.key === 'drunk') return '你带着浓浓酒意，声音发飘地';
+  if (stage.key === 'tipsy') return '你面带酒红，笑着';
+  return '你';
+}
+
+function getDrunkWakeEffect(player) {
+  const stage = getDrunkStage(player);
+  if (stage.key === 'sober') return null;
+  const before = Number(player.drunk || 0);
+  const reduced = stage.key === 'wasted' ? Math.max(0, before - 35) : stage.key === 'drunk' ? Math.max(0, before - 24) : Math.max(0, before - 16);
+  player.drunk = reduced;
+  player.lastDrinkDecayAt = Date.now();
+  player.jingli = Math.min(player.maxJingli ?? 100, Math.max(0, (player.jingli ?? 100) + (stage.key === 'wasted' ? -8 : -3)));
+  player.mp = Math.max(0, player.mp - (stage.key === 'wasted' ? 6 : 2));
+  if (stage.key === 'wasted') return '你宿醉未醒，口干舌苦，太阳穴突突直跳。';
+  if (stage.key === 'drunk') return '你揉了揉额角，只觉酒气散了些，人也清醒不少。';
+  return '你打了个呵欠，胸口那点酒意也淡了下去。';
+}
+
 function getMoneySummary(player) {
   ensureMoneyState(player);
   return `铜钱:${player.coin} 银:${player.silver} 金:${player.gold}`;
@@ -3191,6 +3219,7 @@ wss.on('connection', (ws, req) => {
         player.sleeping = false;
         player.hp = player.maxHp;
         player.jingli = player.maxJingli ?? 100;
+        const drunkWakeMsg = getDrunkWakeEffect(player);
         let wakeMsg;
         if (player.hp >= player.maxHp * 0.8) {
           wakeMsg = '一觉醒来，你感到神清气爽';
@@ -3199,7 +3228,7 @@ wss.on('connection', (ws, req) => {
         } else {
           wakeMsg = '一觉醒来，你感觉腰酸背痛';
         }
-        ws.send(wakeMsg + '。\n【当前】HP: ' + player.hp + '/' + player.maxHp + '\n>');
+        ws.send(wakeMsg + `。${drunkWakeMsg ? `\n${drunkWakeMsg}` : ''}\n【当前】HP: ` + player.hp + '/' + player.maxHp + ` MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${getDrunkStage(player).label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
         saveProgress();
         return;
       } else {
@@ -3916,7 +3945,7 @@ wss.on('connection', (ws, req) => {
             saveProgress();
             broadcastRoomAction(player, getDrinkWitnessText(player, args, beforeStage, drunkStage));
             maybeBroadcastDrunkNpcReaction(player);
-            ws.send(`你仰头饮下${args}，${drink.desc}${extraMsg}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${drunkStage.label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
+            ws.send(`你仰头饮下${args}，${drink.selfFlavor || drink.desc}${extraMsg}\n【当前】HP:${player.hp}/${player.maxHp} MP:${player.mp}/${player.maxMp} STA:${player.jingli}/${player.maxJingli} 酒意:${drunkStage.label}(${Math.max(0, Math.floor(player.drunk || 0))}/100)\n>`);
             break;
           }
           if (args === 'drug' || args === '金创药') {
@@ -4304,7 +4333,9 @@ wss.on('connection', (ws, req) => {
             });
             const help = getNpcSpecialHelp(npcTalkName);
             const helpText = help.length ? `\n可试指令: ${help.join(' | ')}` : '';
-            ws.send(`你和${formatNpcName(npcTalkName)}交谈了几句。\n${npcTalkName}说道：「${reply}」${helpText}\n>`);
+            const speechPrefix = getDrunkSpeechPrefix(player);
+            const drunkHint = getDrunkStage(player).key === 'sober' ? '' : `\n${npcTalkName}闻到你身上淡淡酒气，不由多看了你两眼。`;
+            ws.send(`${speechPrefix}和${formatNpcName(npcTalkName)}交谈了几句。\n${npcTalkName}说道：「${reply}」${drunkHint}${helpText}\n>`);
           }
           break;
 
