@@ -106,6 +106,13 @@ const npcCatalog = {
     }
   },
   '神秘人': { alias: 'mysteryman', quote: '有些事，知道得越少越安全。', money: 66, loot: ['黑色令牌'], role: '神秘人物' },
+  '怪人': { alias: 'guairen', quote: '嘿嘿……你也听见井里有人说话了？', money: 24, loot: ['怪石', '破布条'], role: '荒地怪人' },
+  '疯癫老者': { alias: 'fengdianlaozhe', quote: '庙里没神，井里没鬼，可人心里有什么，谁说得准？', money: 36, loot: ['残破纸符', '旧铜镜'], role: '疯癫异士' },
+  '黑衣怪客': { alias: 'heiyiguaike', quote: '看见我的人，最好都当自己没看见。', money: 42, loot: ['黑布蒙面', '密信残角'], role: '行迹诡秘的怪客' },
+  '井边怪人': { alias: 'jingbianguairen', quote: '别往下看，井底看久了，井底也会看你。', money: 30, loot: ['井绳碎段', '残旧护符'], role: '废井旁的怪人' },
+  '疯和尚': { alias: 'fengheshang', quote: '佛像塌了，可香火还在，妙不妙？', money: 28, loot: ['香灰包', '破木鱼'], role: '破庙疯僧' },
+  '夜行怪人': { alias: 'yexingguairen', quote: '白天走路，晚上走影子。你猜我现在走的是哪一样？', money: 48, loot: ['夜行布', '怪人残页'], role: '夜里出没的怪人' },
+  '无名乞丐': { alias: 'wumingqigai', quote: '我什么都没看见，但要是赏口饭，兴许能想起一点。', money: 14, loot: ['破碗', '发霉馒头'], role: '躲在荒地边的乞丐' },
   '镖头': {
     alias: 'escortchief',
     quote: '走镖最重要的，是人和货都得活着。',

@@ -448,9 +448,39 @@ const rooms = {
     shop: null
   },
   '扬州小巷': {
-    description: '一条偏僻的小巷，两边是低矮的民房。北边是药店，南边是赌场，东边便是灯火通明的丽春院，西边可折回主街。',
-    exits: { '北': '药店', '南': '赌场', '东': '丽春院', '西': '扬州街北' },
+    description: '一条偏僻的小巷，两边是低矮的民房。北边是药店，南边是赌场，东边便是灯火通明的丽春院。巷子尽头还有一道歪斜破墙，翻过去便是少有人去的荒地。',
+    exits: { '北': '药店', '南': '赌场', '东': '丽春院', '西': '城西荒地' },
     npcs: ['流浪猫'],
+    shop: null
+  },
+  '城西荒地': {
+    description: '这里已出了扬州城西，荒草及膝，断墙残砖半埋在土里，风一吹便有纸灰打着旋儿。四下少有人来，只偶尔能看见几个衣衫古怪、行迹飘忽的怪人出没，让人心里发毛。再往深处，隐约可见一口废井、一座破庙，还有通向乱葬岗的小路。',
+    exits: { '东': '扬州小巷', '北': '废井边', '西': '破庙', '南': '乱葬岗小路' },
+    npcs: ['怪人', '疯癫老者', '黑衣怪客'],
+    shop: null
+  },
+  '废井边': {
+    description: '一口早已荒废的老井斜斜歪在枯草间，井栏裂开数道缝，井口幽黑，靠近时总觉得下面像藏着什么。',
+    exits: { '南': '城西荒地' },
+    npcs: ['井边怪人'],
+    shop: null
+  },
+  '破庙': {
+    description: '半塌的破庙被野藤缠住，泥塑神像只剩半张脸，香案翻倒在地。庙里似有人待过，却看不见正经香客。',
+    exits: { '东': '城西荒地', '北': '废弃偏殿' },
+    npcs: ['疯和尚', '黑衣怪客'],
+    shop: null
+  },
+  '废弃偏殿': {
+    description: '偏殿屋顶漏风，残破经幡贴在梁上，角落里堆着些早已霉烂的蒲团。这里比外头更静，静得近乎诡异。',
+    exits: { '南': '破庙' },
+    npcs: [],
+    shop: null
+  },
+  '乱葬岗小路': {
+    description: '一条通往乱葬岗的小路，路边枯树斜生，地上偶有纸钱和碎瓦。风一过，连狗都不敢叫。',
+    exits: { '北': '城西荒地' },
+    npcs: ['夜行怪人', '无名乞丐'],
     shop: null
   },
   '扬州城门': {
@@ -1501,7 +1531,9 @@ function maybeMoveSmartNpc(npcName) {
   const chance = typeof moveCfg.idleMoveChance === 'number' ? moveCfg.idleMoveChance : 0;
   if (Math.random() > chance) return;
   const currentRoomName = getRoomByNpcName(npcName);
-  const candidates = moveCfg.allowedRooms.filter(roomName => rooms[roomName] && roomName !== currentRoomName);
+  let candidates = moveCfg.allowedRooms.filter(roomName => rooms[roomName] && roomName !== currentRoomName);
+  if (!candidates.length) return;
+  if (!isNightTime()) candidates = candidates.filter(roomName => !['乱葬岗小路', '废井边', '废弃偏殿'].includes(roomName));
   if (!candidates.length) return;
   const targetRoomName = candidates[Math.floor(Math.random() * candidates.length)];
   moveNpcToRoom(npcName, targetRoomName);
@@ -3096,20 +3128,217 @@ function ensureInvestigationProgress(player) {
   player.questProgress = player.questProgress || {};
   if (!player.questProgress.dockCaseQuest) player.questProgress.dockCaseQuest = { stage: 'idle', clues: {}, solved: false };
   if (!player.questProgress.laobaoMessageQuest) player.questProgress.laobaoMessageQuest = { stage: 'idle', clues: {}, solved: false };
+  if (!player.questProgress.wastelandQuest) player.questProgress.wastelandQuest = { stage: 'idle', clues: {}, solved: false };
+}
+
+function getRoomInvestigationEvent(player, roomName) {
+  ensureInvestigationProgress(player);
+  if (player.questProgress.dockCaseQuest.stage === 'started') {
+    const dockClues = player.questProgress.dockCaseQuest.clues || {};
+    if (roomName === '扬州码头' && !dockClues.dock) {
+      return '你站在码头边四下打量，隐约觉得这里确实藏着点不对劲。若想查清，最好主动搜一搜，或找人旁敲侧击问问。';
+    }
+    if (roomName === '客栈' && !dockClues.inn) {
+      return '客栈人来人往，表面热闹，里头却像埋着点事。你觉得坐下来细听，或向人打听，也许能摸到线头。';
+    }
+    if (roomName === '扬州小巷' && !dockClues.alley) {
+      return '小巷里气氛有些古怪，像是有人刚说了什么不该说的话。你若肯多留神，也许能从细处听出门道。';
+    }
+    if (roomName === '城西荒地' && !dockClues.wasteland) {
+      return '荒地断墙边风声怪得很，像是有人来过又故意抹掉痕迹。若细细搜查，说不定还能捡起一点头绪。';
+    }
+  }
+  if (player.questProgress.laobaoMessageQuest.stage === 'started') {
+    const laobaoClues = player.questProgress.laobaoMessageQuest.clues || {};
+    if (roomName === '丽春院' && !laobaoClues.brothel) {
+      player.questProgress.laobaoMessageQuest.clues.brothel = '你注意到有人递杯时总用左手，袖口还带着淡淡胭脂香。';
+      return '【丽春院密信】你在丽春院里装作听曲，余光却瞥见一名来客接酒时总用左手，袖口还沾着淡淡胭脂香，和寻常跑船汉子的做派很不一样。';
+    }
+    if (roomName === '扬州码头' && !laobaoClues.dock) {
+      player.questProgress.laobaoMessageQuest.clues.dock = '码头上有人嘴上说跑船，鞋底却干净得不像常年踩水的人。';
+      return '【丽春院密信】你站在码头边看人卸货，忽然发现一人嘴上说自己是跑船的，可靴底却干净得过分，连点湿泥都不带，倒像是刚从城里铺地走来。';
+    }
+    if (roomName === '客栈' && !laobaoClues.inn) {
+      player.questProgress.laobaoMessageQuest.clues.inn = '客栈里有人每次听到“丽春院”三个字，眼神都会微微一紧。';
+      return '【丽春院密信】你在客栈喝茶时故意提了句“丽春院”，靠窗那桌一人本来正低头吃面，听见这三个字后手上筷子竟停了一瞬，眼神也跟着紧了一下。';
+    }
+    if (roomName === '破庙' && !laobaoClues.temple) {
+      player.questProgress.laobaoMessageQuest.clues.temple = '破庙香案下压着半截潮纸，上头只写了“西边旧井，子时”几个字。';
+      return '【丽春院密信】你在破庙翻动香案时，摸到半截受潮的纸片，上头只剩“西边旧井，子时”几个字，像是某次传信留下的残迹。';
+    }
+  }
+  if (player.questProgress.wastelandQuest.stage === 'started') {
+    const wastelandClues = player.questProgress.wastelandQuest.clues || {};
+    if (roomName === '城西荒地' && !wastelandClues.wasteland) {
+      player.questProgress.wastelandQuest.clues.wasteland = '荒地上有几串足印来回交错，其中一串明显总是往破庙方向去。';
+      return '【城西怪影】你沿着荒草压倒的痕迹慢慢往前找，发现几串足印来回交错，可其中一串格外稳，像是熟门熟路地总往破庙方向去。';
+    }
+    if (roomName === '废井边' && !wastelandClues.well) {
+      player.questProgress.wastelandQuest.clues.well = '井栏边留下了磨损痕迹，像是有人常把绳索系在这里，往井下吊送东西。';
+      return '【城西怪影】你伸手摸了摸井栏，木头上有一道反复摩擦留下的深痕，不像年久自然磨损，倒像是经常有人把绳索系在此处往井下放东西。';
+    }
+    if (roomName === '破庙' && !wastelandClues.temple) {
+      player.questProgress.wastelandQuest.clues.temple = '破庙里供的不是佛，倒像是借香火掩人耳目，暗中碰头的地方。';
+      return '【城西怪影】你在破庙里停了片刻，闻到的不是香火味，而是人待久了才会留下的潮闷气。供桌和神像都像摆设，这地方更像有人借破庙掩人耳目，暗中碰头。';
+    }
+    if (roomName === '乱葬岗小路' && !wastelandClues.grave) {
+      player.questProgress.wastelandQuest.clues.grave = '乱葬岗小路上有被踩烂的纸钱和油布碎角，显然夜里常有人经过。';
+      return '【城西怪影】你蹲在乱葬岗小路边，看见纸钱被踩得稀烂，泥里还混着一角油布，显然这里并非只走死人路，夜里常有人借道来回。';
+    }
+  }
+  return '';
 }
 
 function updateRoomClue(player, roomName) {
   ensureInvestigationProgress(player);
-  if (player.questProgress.dockCaseQuest.stage === 'started') {
-    if (roomName === '扬州码头') player.questProgress.dockCaseQuest.clues.dock = '你发现码头脚夫总避开一个总在黄昏出现的生面孔。';
-    if (roomName === '客栈') player.questProgress.dockCaseQuest.clues.inn = '客栈老板提过最近有阔客住店，却从不留真名。';
-    if (roomName === '扬州小巷') player.questProgress.dockCaseQuest.clues.alley = '巷口有人提到“白伞”和“夜里换手递信”。';
+  getRoomInvestigationEvent(player, roomName);
+}
+
+function ensureWastelandState(player) {
+  player.wastelandState = player.wastelandState || {
+    searchedRooms: {},
+    encounterCooldown: 0,
+    strangeManualFound: false,
+    charmFound: false,
+    oddStoneFound: false,
+    oddLetterFound: false,
+    nightVisitedAt: 0,
+    metMadOldMan: false,
+    finalEncounterReady: false,
+    finalEncounterWon: false
+  };
+  player.wastelandState.searchedRooms = player.wastelandState.searchedRooms || {};
+}
+
+function isNightTime() {
+  const hour = new Date().getUTCHours();
+  return hour >= 12 || hour < 1;
+}
+
+function getWastelandAmbientEvent(player) {
+  if (!['城西荒地', '废井边', '破庙', '废弃偏殿', '乱葬岗小路'].includes(player.room)) return '';
+  ensureWastelandState(player);
+  const state = player.wastelandState;
+  const events = [];
+
+  if (player.questProgress?.wastelandQuest?.stage === 'started' && isNightTime() && player.room === '破庙' && !state.finalEncounterReady) {
+    const clueCount = Object.keys(player.questProgress.wastelandQuest.clues || {}).length;
+    if (clueCount >= 3) {
+      state.finalEncounterReady = true;
+      return '你踏进破庙的一瞬，残破神像后忽有衣角一闪。四下风声顿紧，像有什么人终于决定不再躲了。\n一个低沉冷淡的声音自神像后传来：\n「查到这里，还敢一个人来。你是真不怕死，还是觉得扬州城这点怪谈，能困得住我？」\n黑衣怪客缓缓自阴影里走出，目光像刀一样在你身上一寸寸刮过。\n「废井、破庙、乱葬岗，本来只是给蠢人听风捕影的地方。可你既然非要看个明白，那就把命也一并押在这里吧。」\n⚠️【异动】黑衣怪客现身了。若此刻出手，便是真正的最终对峙。';
+    }
   }
-  if (player.questProgress.laobaoMessageQuest.stage === 'started') {
-    if (roomName === '丽春院') player.questProgress.laobaoMessageQuest.clues.brothel = '你注意到有人递杯时总用左手，袖口还带着淡淡胭脂香。';
-    if (roomName === '扬州码头') player.questProgress.laobaoMessageQuest.clues.dock = '码头上有人嘴上说跑船，鞋底却干净得不像常年踩水的人。';
-    if (roomName === '客栈') player.questProgress.laobaoMessageQuest.clues.inn = '客栈里有人每次听到“丽春院”三个字，眼神都会微微一紧。';
+
+  if (player.room === '城西荒地') events.push('风吹过断墙，荒草里像是有人刚刚蹲过，又像什么都没有。');
+  if (player.room === '废井边') events.push('井口深处传来一声极轻的回响，不知是风是人。');
+  if (player.room === '破庙') events.push('半塌神像背后似乎有什么影子一晃，再看又只剩墙上裂纹。');
+  if (player.room === '废弃偏殿') events.push('偏殿里静得出奇，你甚至能听见自己衣角擦过灰尘的声音。');
+  if (player.room === '乱葬岗小路') events.push('路边纸钱忽地打着旋儿飞起来，像被看不见的人踩了一脚。');
+
+  if (isNightTime()) {
+    state.nightVisitedAt = Date.now();
+    events.push('夜色压下来后，这片地方越发邪门，连风声都像有人贴着耳边说话。');
+    if (!state.metMadOldMan && Math.random() < 0.35) {
+      state.metMadOldMan = true;
+      return '夜色深沉时，一个披头散发的老者从断墙后冒出来，盯着你怪笑两声：\n「庙里有纸，井边有符，乱坟底下埋的却不是死人……记住了，子时以后别回头。」';
+    }
   }
+
+  if (Math.random() < 0.38 && events.length) {
+    return events[Math.floor(Math.random() * events.length)];
+  }
+  return '';
+}
+
+function getWastelandSearchResult(player) {
+  ensureWastelandState(player);
+  const state = player.wastelandState;
+  const room = player.room;
+  const now = Date.now();
+  const already = !!state.searchedRooms[room];
+  const options = [];
+
+  if (room === '乱葬岗小路' && !state.oddLetterFound) {
+    options.push({
+      once: true,
+      apply: () => {
+        state.oddLetterFound = true;
+        if (!player.inventory.includes('密信残角')) player.inventory.push('密信残角');
+        return '你在一堆被雨泡烂的纸钱下面翻出一角油布，里头裹着半片【密信残角】。字迹残缺，只能辨出“井”“庙”“换手”几个字。';
+      }
+    });
+  }
+
+  if (room === '废弃偏殿' && Math.random() < 0.45) {
+    options.push({
+      once: false,
+      apply: () => {
+        player.coin += 12;
+        return '你踢开破蒲团，在下面摸到几枚沾灰铜钱，像是谁仓促间遗落在这儿。\n获得铜钱 12。';
+      }
+    });
+  }
+
+  if (room === '城西荒地' && !state.oddStoneFound) {
+    options.push({
+      once: true,
+      apply: () => {
+        state.oddStoneFound = true;
+        player.coin += 18;
+        return '你拨开荒草，发现一块被火熏黑的怪石，旁边还压着几枚旧铜钱。虽然看不出名堂，先收了再说。\n获得铜钱 18。';
+      }
+    });
+  }
+
+  if (room === '废井边' && !state.charmFound) {
+    options.push({
+      once: true,
+      apply: () => {
+        state.charmFound = true;
+        if (!player.inventory.includes('残旧护符')) player.inventory.push('残旧护符');
+        return '你俯身在井栏裂缝里摸索，竟抠出一枚沾泥的【残旧护符】。符面字迹早花，却隐约透着一股阴冷气。';
+      }
+    });
+  }
+
+  if (room === '破庙' && !state.strangeManualFound) {
+    options.push({
+      once: true,
+      apply: () => {
+        state.strangeManualFound = true;
+        player.manualFragments = player.manualFragments || {};
+        player.manualFragments['怪人残页'] = Math.min(3, Number(player.manualFragments['怪人残页'] || 0) + 1);
+        return `你在断裂神龛后翻到一张被香灰熏黄的残纸，上头尽是癫狂批注，像是某门旁门功夫的零碎心得。\n🧩【残页线索】你获得了【怪人残页】线索 (${player.manualFragments['怪人残页']}/3)`;
+      }
+    });
+  }
+
+  if (!already) {
+    options.push({
+      once: false,
+      apply: () => {
+        state.searchedRooms[room] = true;
+        const flavorMap = {
+          '城西荒地': '你在荒草间转了一圈，只看见半截脚印忽深忽浅，像有人走到一半忽然没了踪影。',
+          '废井边': '井口黑得发沉，你凝神细听，井底像有风，又像有人在极远处低低发笑。',
+          '破庙': '破庙梁上落满尘网，角落里有新添的脚印，看来这里并非真的无人踏足。',
+          '乱葬岗小路': '小路两旁纸钱翻飞，几处新土微微隆起，像是最近才被人动过。'
+        };
+        return flavorMap[room] || '你四下查看了一番，暂时没发现更多异样。';
+      }
+    });
+  }
+
+  if (options.length === 0) {
+    if (room === '乱葬岗小路' && now >= Number(state.encounterCooldown || 0)) {
+      state.encounterCooldown = now + 5 * 60 * 1000;
+      return '你刚要转身，乱坟后忽然闪出一道黑影，远远盯了你一眼便没入雾里。你心里一寒，觉得此地不宜久留。';
+    }
+    return '你又仔细翻找了一遍，只剩风吹荒草，再没有更多发现。';
+  }
+
+  const picked = options[Math.floor(Math.random() * options.length)];
+  return picked.apply();
 }
 
 function getBalanceSummary(player) {
@@ -3930,6 +4159,8 @@ wss.on('connection', (ws, req) => {
             faction: player.faction,
             // 扬州赌场掼蛋
             guandan: player.guandan,
+            wastelandState: player.wastelandState,
+            manualFragments: player.manualFragments,
             npcRelations: savedNpcRelations
           });
           saveUsers();
@@ -3939,6 +4170,31 @@ wss.on('connection', (ws, req) => {
       switch (cmd) {
         case 'look':
         case 'l':
+          if (args === '怪人' || args === '疯癫老者' || args === '黑衣怪客' || args === '井边怪人' || args === '疯和尚' || args === '夜行怪人' || args === '无名乞丐') {
+            const oddNpcNotes = {
+              '怪人': '他衣衫破旧却并不全像乞丐，眼神总往你身后飘，仿佛那里还站着别人。',
+              '疯癫老者': '这老者疯疯癫癫，话里却时常夹着几句像谜语一样的真东西。',
+              '黑衣怪客': '他把自己裹得很严，连站姿都透着戒备，像是随时准备翻脸走人。',
+              '井边怪人': '他总站在井沿边上，不看你，只盯着井口，像在等什么从下面爬上来。',
+              '疯和尚': '他嘴里念念有词，半句像佛理，半句像疯话，让人分不清他是真痴还是假癫。',
+              '夜行怪人': '这人只在夜里显得格外活泛，眼神幽亮，走路几乎不发出声音。',
+              '无名乞丐': '他脏得看不出年纪，却总像知道不少事，只是轻易不开口。'
+            };
+            ws.send(`${oddNpcNotes[args]}\n>`);
+            break;
+          }
+          if (args === '荒地' || args === '废井' || args === '井' || args === '破庙' || args === '偏殿' || args === '乱葬岗') {
+            const areaNotes = {
+              '荒地': '荒地深处草高没膝，断墙后隐约通往废井、破庙和一条更阴森的小路。',
+              '废井': '井口边缘长满湿苔，井栏上留着几道像指甲抓出来的浅痕。',
+              '井': '井口边缘长满湿苔，井栏上留着几道像指甲抓出来的浅痕。',
+              '破庙': '庙门半掩，门槛积灰不薄，可偏偏总像有人刚从里头退进去。',
+              '偏殿': '偏殿里堆着破蒲团和碎木牌，翻找一番说不定会有东西。',
+              '乱葬岗': '小路尽头阴气沉沉，白天都让人不愿多待，更别说天黑以后。'
+            };
+            ws.send(`${areaNotes[args]}\n>`);
+            break;
+          }
           if (args) {
             const corpse = findCorpseInRoom(player.room, args);
             if (corpse) {
@@ -4205,25 +4461,25 @@ wss.on('connection', (ws, req) => {
         case '北':
           if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
-          if (movePlayer(player, '北')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向北走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('北边没有路。可用: ' + exits)) + '\n>'); } break;
+          { const mv = movePlayerWithWastelandFlavor(player, '北'); if (mv.moved) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向北走去') + (mv.extra ? `\n🌫️${mv.extra}` : '')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('北边没有路。可用: ' + exits)) + '\n>'); } break; }
         case 's':
         case 'south':
         case '南':
           if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
-          if (movePlayer(player, '南')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向南走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('南边没有路。可用: ' + exits)) + '\n>'); } break;
+          { const mv = movePlayerWithWastelandFlavor(player, '南'); if (mv.moved) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向南走去') + (mv.extra ? `\n🌫️${mv.extra}` : '')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('南边没有路。可用: ' + exits)) + '\n>'); } break; }
         case 'e':
         case 'east':
         case '东':
           if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
-          if (movePlayer(player, '东')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向东走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('东边没有路。可用: ' + exits)) + '\n>'); } break;
+          { const mv = movePlayerWithWastelandFlavor(player, '东'); if (mv.moved) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向东走去') + (mv.extra ? `\n🌫️${mv.extra}` : '')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('东边没有路。可用: ' + exits)) + '\n>'); } break; }
         case 'w':
         case 'west':
         case '西':
           if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; }
           player.following = null;
-          if (movePlayer(player, '西')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向西走去')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('西边没有路。可用: ' + exits)) + '\n>'); } break;
+          { const mv = movePlayerWithWastelandFlavor(player, '西'); if (mv.moved) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向西走去') + (mv.extra ? `\n🌫️${mv.extra}` : '')); } else { const r = getRoom(player.room); const exits = r ? Object.keys(r.exits).join(',') : ''; ws.send((player.lastMoveFailReason || ('西边没有路。可用: ' + exits)) + '\n>'); } break; }
         case 'u':
         case 'up':
         case '上': if (player.meditating) { ws.send('你正在打坐运功，不能移动。\n>'); break; } player.following = null; if (movePlayer(player, '上')) { saveProgress(); broadcastRoomArrival(player, player.room); ws.send(formatOutputBrief(player, '你向上走去')); } else ws.send('上面没有路。'); break;
@@ -4752,6 +5008,16 @@ wss.on('connection', (ws, req) => {
             ws.send('六扇门捕头看了你一眼，沉声道：「若你真想插手，就接下“码头疑案”。输入 quest accept 码头疑案。」\n>');
             break;
           }
+          if ((askNpc === '六扇门捕头' || askNpc === '老鸨') && /城西|荒地|怪人|怪影|破庙/.test(askTopic) && player.questProgress.wastelandQuest?.stage === 'idle') {
+            ws.send(`${askNpc === '六扇门捕头' ? '六扇门捕头沉吟片刻，低声道：「城西那片荒地近来确实邪门。若你胆子够大，就接下“城西怪影”。输入 quest accept 城西怪影。」' : '老鸨把声音压低了几分：「最近总有些不三不四的人从城西那边摸回来，瞧着晦气得很。你若有心，就去查一查“城西怪影”。输入 quest accept 城西怪影。」'}\n>`);
+            break;
+          }
+          if (player.questProgress.dockCaseQuest?.stage === 'started' && askNpc === '客栈老板' && /住店|阔客|生面孔|夜里/.test(askTopic) && !player.questProgress.dockCaseQuest?.clues?.inn) {
+            player.questProgress.dockCaseQuest.clues.inn = '客栈老板提过最近有阔客住店，却从不留真名。';
+            saveProgress();
+            ws.send('你向客栈老板随口打听最近住店的客人。\n客栈老板先是含糊其辞，等你多追问两句，才压低声音道：「最近是有个出手挺阔的生客，住店从不报真名，只说替东家办事。怪的是，这人总在夜里出门，天快亮才回来。」\n>');
+            break;
+          }
           const askReply = await getNpcDialogue({
             npcName: askNpc,
             player,
@@ -5098,6 +5364,53 @@ wss.on('connection', (ws, req) => {
             ws.send('没有这种物品。\n>');
           }
           break;
+
+        case 'search':
+        case '探索':
+        case '搜寻':
+          ensureInvestigationProgress(player);
+          if (player.questProgress.dockCaseQuest?.stage === 'started') {
+            const dockClues = player.questProgress.dockCaseQuest.clues || {};
+            if (player.room === '扬州码头' && !dockClues.dock) {
+              player.questProgress.dockCaseQuest.clues.dock = '你发现码头脚夫总避开一个总在黄昏出现的生面孔。';
+              saveProgress();
+              ws.send('【码头疑案】你假装蹲下系鞋，顺势查看栈桥边的泥地，发现几串脚印到了麻包堆前忽然散开，像是人人都在故意绕着某个人走。你刚起身，又听见两个脚夫低声提到“那人又来了”，说完便立刻闭嘴。\n>');
+              break;
+            }
+            if (player.room === '扬州小巷' && !dockClues.alley) {
+              player.questProgress.dockCaseQuest.clues.alley = '巷口有人提到“白伞”和“夜里换手递信”。';
+              saveProgress();
+              ws.send('【码头疑案】你贴着墙根慢慢往里探，正听见巷口两个闲汉闲聊，其中一个提到“白伞”和“夜里换手递信”，另一个像被针扎了一下似的，立刻变脸走人，只剩半截烟杆落在地上。\n>');
+              break;
+            }
+            if (player.room === '城西荒地' && !dockClues.wasteland) {
+              player.questProgress.dockCaseQuest.clues.wasteland = '荒地里有人用枯枝在地上画过古怪记号，像是在给什么人指路。';
+              saveProgress();
+              ws.send('【码头疑案】你拨开荒草，在断墙根下发现几道被鞋底故意蹭乱的枝划痕，像是谁刚用枯枝画过暗记，又急忙抹掉。痕迹不完整，但看着很像给人指路的记号。\n>');
+              break;
+            }
+          }
+          if (!['城西荒地', '废井边', '破庙', '废弃偏殿', '乱葬岗小路'].includes(player.room)) {
+            ws.send('你在这里四下查看，也没什么特别值得搜寻的。\n>');
+            break;
+          }
+          ensureWastelandState(player);
+          const searchMsg = getWastelandSearchResult(player);
+          saveProgress();
+          ws.send(searchMsg + '\n>');
+          break;
+
+        case 'ask':
+          if (['疯癫老者', '无名乞丐', '疯和尚', '井边怪人'].includes(args) && ['城西荒地', '废井边', '破庙', '乱葬岗小路'].includes(player.room)) {
+            const oddReplies = {
+              '疯癫老者': '疯癫老者咧嘴一笑：“井边摸符，庙里翻纸，乱坟路上若捡到信角，就别再说这是巧合。”',
+              '无名乞丐': '无名乞丐缩着脖子道：“夜里要是看见黑衣人往庙里钻，别追，追的人多数第二天都说自己什么也不记得。”',
+              '疯和尚': '疯和尚敲了敲破木鱼，嘻嘻笑道：“佛不在庙里，秘密倒在庙里。你要找，就找神像后头和偏殿角落。”',
+              '井边怪人': '井边怪人头也不回地道：“井里没宝，只有旧事。有人怕旧事浮上来，才总往这边跑。”'
+            };
+            ws.send(`${oddReplies[args]}\n>`);
+            break;
+          }
 
         case 'read':
         case '阅读':
@@ -5460,6 +5773,11 @@ wss.on('connection', (ws, req) => {
             if (subject?.kind === 'npc') {
               let performData = null;
               let performName = null;
+              ensureWastelandState(player);
+              if (subject.target === '黑衣怪客' && player.room === '破庙' && player.questProgress?.wastelandQuest?.stage === 'started' && !player.wastelandState.finalEncounterReady) {
+                ws.send('黑衣怪客身形一晃，根本不给你近身的机会。你心里明白，眼下还没逼到他现身的时候。\n>');
+                break;
+              }
               if (cmd === 'perform') {
                 if (!performMatch) {
                   ws.send('用法: perform 绝招名 目标名\n>');
@@ -5485,6 +5803,7 @@ wss.on('connection', (ws, req) => {
               const result = runPlayerVsNpcCombat(player, subject.target, player.room, { performData, performName });
               if (result.result === 'npc_dead') {
                 const npcProfile = getNpcCombatProfile(subject.target);
+                const isWastelandBoss = subject.target === '黑衣怪客' && player.room === '破庙' && player.questProgress?.wastelandQuest?.stage === 'started' && player.wastelandState?.finalEncounterReady;
                 createNpcCorpse(player.room, subject.target);
                 const goldGain = npcProfile.coin;
                 const expGain = npcProfile.exp;
@@ -5492,7 +5811,14 @@ wss.on('connection', (ws, req) => {
                 player.exp += expGain;
                 const oldTitle = player.title;
                 player.title = getTitle(player.exp);
-                const titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
+                let extraReward = '';
+                let titleMsg = player.title !== oldTitle ? `\n🎉 恭喜！你的称号提升为【${player.title}】！` : '';
+                if (isWastelandBoss) {
+                  player.wastelandState.finalEncounterWon = true;
+                  player.questProgress.wastelandQuest.clues.final = '你在破庙当面逼出了黑衣怪客，证实城西怪影并非传言，而是有人借怪谈掩护往来行迹。';
+                  if (!player.inventory.includes('黑衣令')) player.inventory.push('黑衣令');
+                  extraReward = '\n⚠️【最终对峙】黑衣怪客被你当场击破，尸身旁落下一枚【黑衣令】。此物足以作为呈报六扇门的硬证。';
+                }
                 saveProgress();
                 ws.send(result.log + `
 ╔══════════════════════════════════════╗
@@ -5501,7 +5827,7 @@ wss.on('connection', (ws, req) => {
 ║  ${subject.target}横尸当场，尸体留在原地        ║
 ║  获得铜钱: ${goldGain}                        ║
 ║  获得经验: ${expGain}                        ║
-╚══════════════════════════════════════╝${titleMsg}
+╚══════════════════════════════════════╝${extraReward}${titleMsg}
 >`);
               } else if (result.result === 'player_dead') {
                 handlePlayerDeath(player, null, ws);
@@ -6123,30 +6449,62 @@ ${Number(player.drunk || 0) > 0 ? `║ 酒意: ${getDrunkStage(player).label} ($
             ws.send('【任务开始: 丽春院密信】\n老鸨怀疑有人借丽春院递消息。去丽春院、扬州码头、客栈多观察，拼出真正的递信人。\n之后可向老鸨回报。\n>');
             break;
           }
+          if (args === 'accept 城西怪影') {
+            player.quest = '城西怪影';
+            player.questProgress.wastelandQuest = { stage: 'started', clues: {}, solved: false };
+            saveProgress();
+            ws.send('【任务开始: 城西怪影】\n近来总有人说，城西荒地一到夜里便有怪人出没，破庙、废井、乱葬岗一线像藏着什么秘密。\n你可去城西荒地、废井边、破庙、乱葬岗小路多走动、多搜寻、多问话，拼出幕后真相。\n查明后可输入 quest solve 城西怪影 答案。\n>');
+            break;
+          }
           if (args === 'clues' || args === '线索') {
             const dockClues = Object.values(player.questProgress.dockCaseQuest?.clues || {});
             const laobaoClues = Object.values(player.questProgress.laobaoMessageQuest?.clues || {});
+            const wastelandClues = Object.values(player.questProgress.wastelandQuest?.clues || {});
             let clueMsg = '【当前线索】\n';
             clueMsg += `码头疑案: ${dockClues.length ? '\n- ' + dockClues.join('\n- ') : '暂无'}\n\n`;
-            clueMsg += `丽春院密信: ${laobaoClues.length ? '\n- ' + laobaoClues.join('\n- ') : '暂无'}\n>`;
+            clueMsg += `丽春院密信: ${laobaoClues.length ? '\n- ' + laobaoClues.join('\n- ') : '暂无'}\n\n`;
+            clueMsg += `城西怪影: ${wastelandClues.length ? '\n- ' + wastelandClues.join('\n- ') : '暂无'}\n>`;
             ws.send(clueMsg);
+            break;
+          }
+          if (args === 'solve 码头疑案') {
+            ws.send('用法: quest solve 码头疑案 情报贩子\n你也可以先输入 quest clues 查看当前线索。\n>');
+            break;
+          }
+          if (args === 'solve 丽春院密信') {
+            ws.send('用法: quest solve 丽春院密信 客栈老板\n你也可以先输入 quest clues 查看当前线索。\n>');
+            break;
+          }
+          if (args === 'solve 城西怪影') {
+            ws.send('用法: quest solve 城西怪影 黑衣怪客\n你也可以先输入 quest clues 查看当前线索。\n>');
             break;
           }
           if (args && args.startsWith('solve 码头疑案 ')) {
             const answer = args.substring('solve 码头疑案 '.length).trim();
-            const clues = player.questProgress.dockCaseQuest?.clues || {};
+            const dockQuest = player.questProgress.dockCaseQuest || { stage: 'idle', clues: {}, solved: false };
+            const clues = dockQuest.clues || {};
+            if (dockQuest.solved || dockQuest.stage === 'done') {
+              ws.send('【码头疑案】这桩案子你已经办结了，六扇门那边也早记了你的功，不会再重复给奖。\n>');
+              break;
+            }
             if (Object.keys(clues).length < 2) {
               ws.send('你掌握的线索还不够，至少再去两个地方看看。\n>');
               break;
             }
             if (answer === '情报贩子') {
+              const roomNow = getRoom(player.room);
+              const informerHere = !!resolveNpcName('情报贩子', roomNow);
+              if (!informerHere) {
+                ws.send('你既然认定是情报贩子，至少也该当面指人。先找到情报贩子在场，再来定案。\n>');
+                break;
+              }
               player.questProgress.dockCaseQuest.solved = true;
               player.questProgress.dockCaseQuest.stage = 'done';
               player.exp += 60;
               player.coin += 40;
               noteNpcInteraction('六扇门捕头', player, 'gift');
               saveProgress();
-              ws.send('【任务完成: 码头疑案】\n你将矛头指向了情报贩子。六扇门捕头没有立刻下结论，却明显高看了你一眼。\n奖励: 经验+60 铜钱+40\n今后你向六扇门捕头打听案情时，他会更认真对待。\n>');
+              ws.send('【任务完成: 码头疑案】\n你当着众人的面点出了情报贩子。六扇门捕头没有立刻下结论，却明显高看了你一眼。\n奖励: 经验+60 铜钱+40\n今后你向六扇门捕头打听案情时，他会更认真对待。\n>');
             } else {
               noteNpcInteraction('六扇门捕头', player, 'inquire', { topic: '误判案情', sensitive: true });
               saveProgress();
@@ -6173,6 +6531,33 @@ ${Number(player.drunk || 0) > 0 ? `║ 酒意: ${getDrunkStage(player).label} ($
               noteNpcInteraction('老鸨', player, 'inquire', { topic: '误判递信人', sensitive: true });
               saveProgress();
               ws.send(`【判断有误】\n老鸨听你报出【${answer}】，只用手帕掩嘴笑了笑：“客官这回看错人啦，不过也不算全无眼力。”\n>`);
+            }
+            break;
+          }
+          if (args && args.startsWith('solve 城西怪影 ')) {
+            const answer = args.substring('solve 城西怪影 '.length).trim();
+            const clues = player.questProgress.wastelandQuest?.clues || {};
+            if (Object.keys(clues).length < 3) {
+              ws.send('城西那边的线索你还没摸透，至少再去三个点查清楚再来下结论。\n>');
+              break;
+            }
+            if (answer === '黑衣怪客' || answer === '黑衣人') {
+              if (!player.wastelandState?.finalEncounterWon && !player.inventory.includes('黑衣令')) {
+                ws.send('你虽已猜到幕后多半是黑衣怪客，但眼下还缺一锤定音的硬证。最好夜里去破庙，把他真正逼出来。\n>');
+                break;
+              }
+              player.questProgress.wastelandQuest.solved = true;
+              player.questProgress.wastelandQuest.stage = 'done';
+              player.exp += 80;
+              player.coin += 60;
+              if (!player.inventory.includes('城西密符')) player.inventory.push('城西密符');
+              noteNpcInteraction('六扇门捕头', player, 'gift');
+              saveProgress();
+              ws.send('【任务完成: 城西怪影】\n你不但判断出城西怪影正是黑衣怪客，还在破庙当面逼出了对方真身，并取回了实证。六扇门捕头听后沉默半晌，只说你这回查得很稳。\n奖励: 经验+80 铜钱+60 物品【城西密符】\n今后再查扬州诡事时，旁人会更愿意信你几分。\n>');
+            } else {
+              noteNpcInteraction('六扇门捕头', player, 'inquire', { topic: '误判城西怪影', sensitive: true });
+              saveProgress();
+              ws.send(`【判断有误】\n你将城西怪影指向【${answer}】，六扇门捕头没有立刻反驳，只淡淡道：“荒地里的怪人不少，但真正串线的人未必最疯。”\n>`);
             }
             break;
           }
@@ -6656,6 +7041,7 @@ breakretreat / 出关 - 提前强行出关
 breakthrough / 破境 - 尝试突破当前境界门槛
 read [秘籍] / 阅读 [秘籍] - 阅读秘籍、残卷、壁画
 combine [残卷] / 拼合 [残卷] - 拼合残页线索
+search / 搜寻 / 探索 - 主动调查当前地点，寻找线索或隐藏物
 废功 [内功] - 自废某门内功修为
 叛师 - 退出当前师门
 shop - 查看商店
@@ -6716,6 +7102,15 @@ function movePlayer(player, direction) {
     return true;
   }
   return false;
+}
+
+function movePlayerWithWastelandFlavor(player, direction) {
+  const moved = movePlayer(player, direction);
+  if (!moved) return { moved: false, extra: '' };
+  const investigationMsg = getRoomInvestigationEvent(player, player.room);
+  const ambientMsg = getWastelandAmbientEvent(player);
+  const extraParts = [investigationMsg, ambientMsg].filter(Boolean);
+  return { moved: true, extra: extraParts.join('\n') };
 }
 
 setInterval(() => {
