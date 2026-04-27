@@ -484,9 +484,9 @@ const rooms = {
     shop: null
   },
   '扬州城门': {
-    description: '扬州城的北门，城门高大坚固，官兵把守严密。',
+    description: '扬州城的北门，城门高大坚固，官兵把守严密。城门边常有六扇门的人来回巡看。',
     exits: { '南': '扬州街北', '北': '扬州郊外' },
-    npcs: ['官兵', '守门士兵'],
+    npcs: ['官兵', '守门士兵', '六扇门捕头'],
     shop: null
   },
   '扬州郊外': {
@@ -1669,6 +1669,8 @@ async function getNpcDialogue({ npcName, player, action, topic, userInput }) {
   if (generated) return generated;
 
   if (action === 'ask' && npcName === '老鸨') {
+    if (player.questProgress?.laobaoMessageQuest?.stage === 'idle' && /消息|密信|递消息/.test(topic || '')) return '你若真有心，不妨接下这桩“丽春院密信”。可输入 quest accept 丽春院密信 接下此事。';
+    if (player.questProgress?.wastelandQuest?.stage === 'idle' && /城西|荒地|怪人|怪影|破庙/.test(topic || '')) return '最近总有些不三不四的人从城西那边摸回来，瞧着晦气得很。你若有心，就去查一查“城西怪影”。可输入 quest accept 城西怪影 接下这桩麻烦事。';
     if (player.questProgress?.laobaoMessageQuest?.stage === 'done') return '老鸨轻晃团扇，低笑道：「上回那桩递消息的事，你办得不坏。以后再有这种风声，我会先想起你。」';
     if (relation.favor >= 3) return `老鸨压低声音说道：「${topic}这事，我能多告诉你一句，不过你可别转头就把我卖了。」`;
     if (/秘密|把柄|黑市|码头|可疑/.test(topic)) return `老鸨眯起眼，压低声音说道：「${topic}这事啊，我倒是听过些风声。不过你若连茶水钱都不肯出，我最多只能说个半真半假。」`;
@@ -1678,20 +1680,29 @@ async function getNpcDialogue({ npcName, player, action, topic, userInput }) {
     return `老鸨满脸堆笑地说道：「客官来得巧，丽春院有酒有消息，想听热闹还是想做生意？银子到位，什么都好说。」${getNpcVendorText(npcMeta)}`;
   }
   if (action === 'talk' && npcName === '情报贩子') {
+    if (player.questProgress?.dockCaseQuest?.stage === 'done') return '情报贩子压低斗笠，意味深长地笑了笑：「上回你在码头点我那一下，倒把不少人都吓精神了。如今扬州这潭水，更没人敢说你只是个过路客。」';
+    if (player.questProgress?.laobaoMessageQuest?.stage === 'done') return '情报贩子指尖轻敲桌面：「丽春院那条线你都能摸出来，眼力算是过关了。以后再问消息，我会多给你留半句真的。」';
     return relation.trust >= 3 ? '情报贩子把声音压得极低：「你若还想听更深的，就得替我先办一件事。」' : '情报贩子冷笑一声：「消息我有，价钱也有，就看你买不买得起。便宜话我这里没有，假消息倒是看人送。」';
   }
   if (action === 'talk' && npcName === '黄药师') {
     return relation.favor >= 2 || (player.先天?.悟性 || 0) >= 8 ? '黄药师淡淡说道：「你若真有几分悟性，我倒不介意再听你多说两句。」' : '黄药师负手而立，冷冷道：「空口白话最是无趣，你若无真才实学，少来烦我。」';
   }
   if (action === 'talk' && npcName === '六扇门捕头') {
+    if (player.questProgress?.wastelandQuest?.stage === 'done') return '六扇门捕头看着你，缓缓点头：「连城西那条最邪的线都让你查实了。往后扬州再起诡事，我第一个想到的就是你。」';
     if (player.questProgress?.dockCaseQuest?.stage === 'done') return '六扇门捕头点了点头：「上回码头那事，你做得还算稳当。以后若还有难办的案子，我会再找你。」';
     return relation.trust >= 2 ? '六扇门捕头沉声道：「你这人还算有点分寸。若肯帮我盯一盯码头那几个生面孔，城里的事我可以多告诉你一些。」' : '六扇门捕头目光沉稳：「若没正事，就别在公门口多转悠。」';
   }
   if (action === 'inquire' && npcName === '情报贩子') {
+    if (player.questProgress?.dockCaseQuest?.stage === 'done' && /码头|白伞|换手|递信/.test(topic || '')) return '情报贩子扯了扯嘴角：「码头那批人如今收敛多了。你上回一露手，许多本该走的暗线，自己就先断了半截。」';
+    if (player.questProgress?.laobaoMessageQuest?.stage === 'done' && /丽春院|密信|旧井|子时/.test(topic || '')) return '情报贩子把声音压低：「丽春院那事之后，旧井边近来安静得很。可越安静，越说明有人被你吓着了，不敢乱动。」';
     if (relation.suspicion >= 2) return '情报贩子眯起眼道：「你问得太细了。再问下去，我就得怀疑你到底替谁做事。」';
     if (/黑市|码头|秘密|身份/.test(topic || '')) return '情报贩子轻轻一笑：「这话题值钱，我今天最多给你半句真话。真想知道全的，拿诚意来换。」';
   }
   if (action === 'inquire' && npcName === '六扇门捕头') {
+    if (player.questProgress?.dockCaseQuest?.stage === 'idle' && /码头|可疑|案|通缉/.test(topic || '')) return '若你真想插手，不妨先接下“码头疑案”。可输入 quest accept 码头疑案 领下这条线。';
+    if (player.questProgress?.wastelandQuest?.stage === 'idle' && /城西|荒地|怪人|怪影|破庙/.test(topic || '')) return '城西那片荒地近来确实邪门。若你胆子够大，就接下“城西怪影”。可输入 quest accept 城西怪影 领下这桩差事。';
+    if (player.questProgress?.wastelandQuest?.stage === 'done' && /城西|怪影|破庙|黑衣/.test(topic || '')) return '六扇门捕头沉声道：「城西那条线已经让你拔掉大半。如今再有人借怪谈掩事，我这里第一时间就会盯上。」';
+    if (player.questProgress?.dockCaseQuest?.stage === 'done' && /码头|可疑|案/.test(topic || '')) return '六扇门捕头低声道：「码头近来老实多了。你上回查得准，很多原本不肯开口的人，如今也知道该掂量分寸。」';
     if (/通缉|可疑|案/.test(topic || '')) return relation.trust >= 2 ? '六扇门捕头压低声音道：「这案子我还在查，你若真想插手，就先替我盯紧扬州码头。」' : '六扇门捕头冷冷道：「案情未明，不该你知道的就别多问。」';
   }
   return `${attitudeLine ? `${attitudeLine} ` : ''}${npcMeta.quote}`;
@@ -1824,12 +1835,15 @@ function getNpcProactiveLine(npcName, player) {
   const mood = touchNpcMood(npcName)?.mood || '平静';
   const qp = player.questProgress || {};
   if (npcName === '老鸨') {
+    if (qp.laobaoMessageQuest?.stage === 'done') return '老鸨笑意更深了些，轻轻招手道：「哟，咱们丽春院的小功臣来了。今儿若想听风声，我可舍得多送你半句真话。」';
     if (qp.laobaoMessageQuest?.stage === 'started') return '老鸨眼波一转，轻声道：「你若真想知道谁在院里递消息，就别只会听，得学会看人。」';
     if (state.favor >= 3) return '老鸨笑着招手道：「熟客来了，今儿有两桩新鲜事，你若想听，我给你留一半真话。」';
     if (mood === '戒备') return '老鸨先四下看了看，这才压低声音道：「今儿风声紧，想听消息，先把手脚放干净些。」';
     return '老鸨甩了甩手帕，笑吟吟道：「客官，想听热闹，还是想买消息？」';
   }
   if (npcName === '情报贩子') {
+    if (qp.dockCaseQuest?.stage === 'done') return '情报贩子抬眼看了你一下，低低笑道：「现在城里不少人见了你，都先想想自己嘴边的话该不该说。」';
+    if (qp.laobaoMessageQuest?.stage === 'done') return '情报贩子用指节轻轻敲桌：「你连丽春院那条暗线都摸出来了，倒省得我再把你当外行。」';
     if (state.trust >= 3) return '情报贩子朝你勾了勾手指：「你来得巧，我手里有条消息，旁人我还不想卖。」';
     if (mood === '试探') return '情报贩子眯眼打量你：「消息有的是，就看你值不值得我开口。」';
     return '情报贩子指尖轻敲桌面：「过了今晚，有些消息可就不是这个价了。」';
@@ -1839,6 +1853,8 @@ function getNpcProactiveLine(npcName, player) {
     return '黄药师拂袖而立，淡淡道：「若无几分真本事，少来我面前空费口舌。」';
   }
   if (npcName === '六扇门捕头') {
+    if (qp.wastelandQuest?.stage === 'done') return '六扇门捕头看见你，神色都缓了半分：「城西那回你查得漂亮。如今扬州若再起邪风，衙门里也没人敢小看你的话。」';
+    if (qp.dockCaseQuest?.stage === 'done') return '六扇门捕头低声道：「码头自从让你敲过一回，近来安静了不少。可越安静，我越知道还有人怕你。」';
     if (qp.dockCaseQuest?.stage === 'started') return '六扇门捕头压低声音道：「码头那几个人别惊动，先看他们都和谁接头。」';
     if (state.trust >= 2) return '六扇门捕头低声道：「你若有空，替我盯一盯最近在码头晃荡的那几个人。」';
     return '六扇门捕头目光一扫，沉声道：「城里近来不太平，若见着不对劲的人，记得来报。」';
@@ -3151,20 +3167,16 @@ function getRoomInvestigationEvent(player, roomName) {
   if (player.questProgress.laobaoMessageQuest.stage === 'started') {
     const laobaoClues = player.questProgress.laobaoMessageQuest.clues || {};
     if (roomName === '丽春院' && !laobaoClues.brothel) {
-      player.questProgress.laobaoMessageQuest.clues.brothel = '你注意到有人递杯时总用左手，袖口还带着淡淡胭脂香。';
-      return '【丽春院密信】你在丽春院里装作听曲，余光却瞥见一名来客接酒时总用左手，袖口还沾着淡淡胭脂香，和寻常跑船汉子的做派很不一样。';
+      return '你混在听曲的人堆里，越看越觉得有人举止不对。若想拿到真凭实据，得自己多搜一搜，或借着闲谈把话慢慢套出来。';
     }
     if (roomName === '扬州码头' && !laobaoClues.dock) {
-      player.questProgress.laobaoMessageQuest.clues.dock = '码头上有人嘴上说跑船，鞋底却干净得不像常年踩水的人。';
-      return '【丽春院密信】你站在码头边看人卸货，忽然发现一人嘴上说自己是跑船的，可靴底却干净得过分，连点湿泥都不带，倒像是刚从城里铺地走来。';
+      return '码头边来来去去的人不少，可你总觉得其中有个“跑船汉子”像是装出来的。若肯细查靴底、衣角这些小处，或许能看出破绽。';
     }
     if (roomName === '客栈' && !laobaoClues.inn) {
-      player.questProgress.laobaoMessageQuest.clues.inn = '客栈里有人每次听到“丽春院”三个字，眼神都会微微一紧。';
-      return '【丽春院密信】你在客栈喝茶时故意提了句“丽春院”，靠窗那桌一人本来正低头吃面，听见这三个字后手上筷子竟停了一瞬，眼神也跟着紧了一下。';
+      return '客栈里几桌人都装得若无其事，可“丽春院”三个字像是能刺到某些人的耳朵。坐下来慢慢听，或试着开口问问，也许能逼出反应。';
     }
     if (roomName === '破庙' && !laobaoClues.temple) {
-      player.questProgress.laobaoMessageQuest.clues.temple = '破庙香案下压着半截潮纸，上头只写了“西边旧井，子时”几个字。';
-      return '【丽春院密信】你在破庙翻动香案时，摸到半截受潮的纸片，上头只剩“西边旧井，子时”几个字，像是某次传信留下的残迹。';
+      return '破庙里灰尘虽厚，香案附近却像有人翻动过。若肯亲手搜寻，说不定还能从潮纸碎屑里找出递信痕迹。';
     }
   }
   if (player.questProgress.wastelandQuest.stage === 'started') {
@@ -5001,21 +5013,45 @@ wss.on('connection', (ws, req) => {
           noteNpcInteraction(askNpc, player, 'ask', { topic: askTopic });
           ensureInvestigationProgress(player);
           if (askNpc === '老鸨' && /消息|密信|递消息/.test(askTopic) && player.questProgress.laobaoMessageQuest?.stage === 'idle') {
-            ws.send('老鸨轻摇团扇，低声道：「你若真有心，不妨接下这桩“丽春院密信”。输入 quest accept 丽春院密信。」\n>');
+            ws.send('老鸨轻摇团扇，低声道：「你若真有心，不妨接下这桩“丽春院密信”。\n可输入 quest accept 丽春院密信 接下此事。」\n>');
             break;
           }
           if (askNpc === '六扇门捕头' && /码头|可疑|案|通缉/.test(askTopic) && player.questProgress.dockCaseQuest?.stage === 'idle') {
-            ws.send('六扇门捕头看了你一眼，沉声道：「若你真想插手，就接下“码头疑案”。输入 quest accept 码头疑案。」\n>');
+            ws.send('六扇门捕头看了你一眼，沉声道：「若你真想插手，就接下“码头疑案”。\n可输入 quest accept 码头疑案 领下这条线。」\n>');
             break;
           }
           if ((askNpc === '六扇门捕头' || askNpc === '老鸨') && /城西|荒地|怪人|怪影|破庙/.test(askTopic) && player.questProgress.wastelandQuest?.stage === 'idle') {
-            ws.send(`${askNpc === '六扇门捕头' ? '六扇门捕头沉吟片刻，低声道：「城西那片荒地近来确实邪门。若你胆子够大，就接下“城西怪影”。输入 quest accept 城西怪影。」' : '老鸨把声音压低了几分：「最近总有些不三不四的人从城西那边摸回来，瞧着晦气得很。你若有心，就去查一查“城西怪影”。输入 quest accept 城西怪影。」'}\n>`);
+            ws.send(`${askNpc === '六扇门捕头' ? '六扇门捕头沉吟片刻，低声道：「城西那片荒地近来确实邪门。若你胆子够大，就接下“城西怪影”。\n可输入 quest accept 城西怪影 领下这桩差事。」' : '老鸨把声音压低了几分：「最近总有些不三不四的人从城西那边摸回来，瞧着晦气得很。你若有心，就去查一查“城西怪影”。\n可输入 quest accept 城西怪影 接下这桩麻烦事。」'}\n>`);
             break;
           }
           if (player.questProgress.dockCaseQuest?.stage === 'started' && askNpc === '客栈老板' && /住店|阔客|生面孔|夜里/.test(askTopic) && !player.questProgress.dockCaseQuest?.clues?.inn) {
             player.questProgress.dockCaseQuest.clues.inn = '客栈老板提过最近有阔客住店，却从不留真名。';
             saveProgress();
             ws.send('你向客栈老板随口打听最近住店的客人。\n客栈老板先是含糊其辞，等你多追问两句，才压低声音道：「最近是有个出手挺阔的生客，住店从不报真名，只说替东家办事。怪的是，这人总在夜里出门，天快亮才回来。」\n>');
+            break;
+          }
+          if (player.questProgress.laobaoMessageQuest?.stage === 'started' && askNpc === '老鸨' && /左手|客人|递信|密信|消息|可疑/.test(askTopic) && !player.questProgress.laobaoMessageQuest?.clues?.brothel) {
+            player.questProgress.laobaoMessageQuest.clues.brothel = '老鸨提起近来有个熟客总借敬酒递纸条，且惯用左手遮掩动作。';
+            saveProgress();
+            ws.send('你压低声音问起院里近来的可疑客人。\n老鸨轻轻摇着团扇，瞥了你一眼，才慢条斯理地道：「最近是有个常客不太对劲，敬酒时总爱拿左手挡着袖口，像是在借碰杯递什么小东西。若不是我眼尖，还真叫他糊弄过去。」\n>');
+            break;
+          }
+          if (player.questProgress.laobaoMessageQuest?.stage === 'started' && askNpc === '客栈老板' && /丽春院|跑船|住店|生面孔|递信/.test(askTopic) && !player.questProgress.laobaoMessageQuest?.clues?.inn) {
+            player.questProgress.laobaoMessageQuest.clues.inn = '客栈老板承认有人一听到“丽春院”就紧张，还总借口替人带口信。';
+            saveProgress();
+            ws.send('你故意把话题绕到丽春院和最近住店的生面孔上。\n客栈老板本想含混过去，见你盯得紧，只得低声道：「最近是有个人奇怪得很，一听人提丽春院，脸色就绷起来。偏他嘴上还老说自己只是替人带个口信，叫我别多问。」\n>');
+            break;
+          }
+          if (player.questProgress.laobaoMessageQuest?.stage === 'started' && askNpc === '情报贩子' && /旧井|子时|破庙|密信|传话/.test(askTopic) && !player.questProgress.laobaoMessageQuest?.clues?.temple) {
+            player.questProgress.laobaoMessageQuest.clues.temple = '情报贩子提到有人常把碰头地点约在西边旧井附近，时辰多半在子时。';
+            saveProgress();
+            ws.send('你旁敲侧击问起西边旧井和夜半传话的事。\n情报贩子眯起眼，半晌才哼了一声：「扬州城里真要避人耳目，常有人把碰头地约在西边旧井那一带。时辰嘛，多半挑子时，省得撞见闲人。」\n>');
+            break;
+          }
+          if (player.questProgress.wastelandQuest?.stage === 'started' && askNpc === '六扇门捕头' && /破庙|黑衣|怪影|硬证|城西/.test(askTopic) && !player.questProgress.wastelandQuest?.clues?.briefing) {
+            player.questProgress.wastelandQuest.clues.briefing = '六扇门捕头提醒你，若想坐实城西怪影，最好夜里去破庙逼对方露面。';
+            saveProgress();
+            ws.send('你问六扇门捕头，城西那条线到底该怎么查实。\n六扇门捕头沉声道：「白天听来的，多半只是风声。你若真想坐实，最好夜里去破庙守一回。那人若真借怪谈掩行迹，迟早会在那里露面。」\n>');
             break;
           }
           const askReply = await getNpcDialogue({
@@ -5227,6 +5263,32 @@ wss.on('connection', (ws, req) => {
           const inquireTopic = inquireMatch[2].trim();
           noteNpcInteraction(inquireNpc, player, 'inquire', { topic: inquireTopic, sensitive: /通缉|身份|把柄|秘密|黑市|杀|案/.test(inquireTopic) });
           ensureInvestigationProgress(player);
+          if (inquireNpc === '六扇门捕头' && /码头|可疑|案|通缉/.test(inquireTopic) && player.questProgress.dockCaseQuest?.stage === 'idle') {
+            ws.send('六扇门捕头看了你一眼，沉声道：「若你真想插手，就接下“码头疑案”。\n可输入 quest accept 码头疑案 领下这条线。」\n>');
+            break;
+          }
+          if ((inquireNpc === '六扇门捕头' || inquireNpc === '老鸨') && /城西|荒地|怪人|怪影|破庙/.test(inquireTopic) && player.questProgress.wastelandQuest?.stage === 'idle') {
+            ws.send(`${inquireNpc === '六扇门捕头' ? '六扇门捕头沉吟片刻，低声道：「城西那片荒地近来确实邪门。若你胆子够大，就接下“城西怪影”。\n可输入 quest accept 城西怪影 领下这桩差事。」' : '老鸨把声音压低了几分：「最近总有些不三不四的人从城西那边摸回来，瞧着晦气得很。你若有心，就去查一查“城西怪影”。\n可输入 quest accept 城西怪影 接下这桩麻烦事。」'}\n>`);
+            break;
+          }
+          if (player.questProgress.dockCaseQuest?.stage === 'started' && inquireNpc === '情报贩子' && /码头|白伞|换手|递信|生面孔/.test(inquireTopic) && !player.questProgress.dockCaseQuest?.clues?.informant) {
+            player.questProgress.dockCaseQuest.clues.informant = '情报贩子承认码头那批人里确有专门换手递信的角色。';
+            saveProgress();
+            ws.send('你不动声色地向情报贩子追问码头那批生面孔。\n情报贩子把声音压得极低：「那几个人不是一路到底的，真正麻烦的是中途换手递信的。你若盯见白伞，再盯谁接过去，案子就快明白了。」\n>');
+            break;
+          }
+          if (player.questProgress.laobaoMessageQuest?.stage === 'started' && inquireNpc === '老鸨' && /密信|递信|可疑|熟客|左手/.test(inquireTopic) && !player.questProgress.laobaoMessageQuest?.clues?.brothel) {
+            player.questProgress.laobaoMessageQuest.clues.brothel = '老鸨认定院里那人不是来寻欢，而是借敬酒递消息。';
+            saveProgress();
+            ws.send('你细细追问老鸨，院里究竟是谁最可疑。\n老鸨把团扇一收，淡淡道：「来寻欢的人眼神不会那么紧，只有来办事的才总盯着别人袖口和桌边酒盏。那人不是来找姑娘，是来借敬酒递消息的。」\n>');
+            break;
+          }
+          if (player.questProgress.wastelandQuest?.stage === 'started' && inquireNpc === '六扇门捕头' && /怪影|黑衣|破庙|井|乱葬岗/.test(inquireTopic) && !player.questProgress.wastelandQuest?.clues?.briefing) {
+            player.questProgress.wastelandQuest.clues.briefing = '六扇门捕头判断城西那些怪象多半是有人故布疑阵，真正关键在破庙。';
+            saveProgress();
+            ws.send('你向六扇门捕头追问城西怪影的底细。\n六扇门捕头缓缓道：「废井、乱葬岗、小路上的那些怪象，多半是拿来唬人的烟幕。真正关键还在破庙，那里才像主事人落脚和碰头的地方。」\n>');
+            break;
+          }
           const inquireReply = await getNpcDialogue({
             npcName: inquireNpc,
             player,
@@ -5387,6 +5449,33 @@ wss.on('connection', (ws, req) => {
               player.questProgress.dockCaseQuest.clues.wasteland = '荒地里有人用枯枝在地上画过古怪记号，像是在给什么人指路。';
               saveProgress();
               ws.send('【码头疑案】你拨开荒草，在断墙根下发现几道被鞋底故意蹭乱的枝划痕，像是谁刚用枯枝画过暗记，又急忙抹掉。痕迹不完整，但看着很像给人指路的记号。\n>');
+              break;
+            }
+          }
+          if (player.questProgress.laobaoMessageQuest?.stage === 'started') {
+            const laobaoClues = player.questProgress.laobaoMessageQuest.clues || {};
+            if (player.room === '丽春院' && !laobaoClues.brothel) {
+              player.questProgress.laobaoMessageQuest.clues.brothel = '你注意到有人递杯时总用左手，袖口还带着淡淡胭脂香。';
+              saveProgress();
+              ws.send('【丽春院密信】你借着听曲饮酒的空当留神看人，果然瞧见一名来客递杯时总用左手，袖口还沾着淡淡胭脂香，像是常出入院中，却又刻意装成外路人。\n>');
+              break;
+            }
+            if (player.room === '扬州码头' && !laobaoClues.dock) {
+              player.questProgress.laobaoMessageQuest.clues.dock = '码头上有人嘴上说跑船，鞋底却干净得不像常年踩水的人。';
+              saveProgress();
+              ws.send('【丽春院密信】你蹲在码头边看人起货，忽然发现一名自称跑船的汉子靴底干净得过分，别说湿泥，连盐碱白痕都没有，倒像是刚从城里铺地上走来。\n>');
+              break;
+            }
+            if (player.room === '客栈' && !laobaoClues.inn) {
+              player.questProgress.laobaoMessageQuest.clues.inn = '客栈里有人每次听到“丽春院”三个字，眼神都会微微一紧。';
+              saveProgress();
+              ws.send('【丽春院密信】你在客栈喝茶时故意把“丽春院”三个字说得响了些，靠窗那桌一人本来正埋头吃面，听见后筷子顿了一瞬，眼神也跟着紧了一下。\n>');
+              break;
+            }
+            if (player.room === '破庙' && !laobaoClues.temple) {
+              player.questProgress.laobaoMessageQuest.clues.temple = '破庙香案下压着半截潮纸，上头只写了“西边旧井，子时”几个字。';
+              saveProgress();
+              ws.send('【丽春院密信】你翻动破庙香案时，从灰里摸出半截受潮纸片，上头只剩“西边旧井，子时”几个字，像是有人匆忙毁掉却没烧干净的传信残片。\n>');
               break;
             }
           }
@@ -6446,7 +6535,7 @@ ${Number(player.drunk || 0) > 0 ? `║ 酒意: ${getDrunkStage(player).label} ($
             player.quest = '丽春院密信';
             player.questProgress.laobaoMessageQuest = { stage: 'started', clues: {}, solved: false };
             saveProgress();
-            ws.send('【任务开始: 丽春院密信】\n老鸨怀疑有人借丽春院递消息。去丽春院、扬州码头、客栈多观察，拼出真正的递信人。\n之后可向老鸨回报。\n>');
+            ws.send('【任务开始: 丽春院密信】\n老鸨怀疑有人借丽春院暗递消息。\n你得自己去丽春院、扬州码头、客栈、破庙留神搜寻，多听、多看、多问，把递信人的路数拼出来。\n等你心里有数了，须当着老鸨的面回报，才能算真正交差。\n>');
             break;
           }
           if (args === 'accept 城西怪影') {
@@ -6457,26 +6546,36 @@ ${Number(player.drunk || 0) > 0 ? `║ 酒意: ${getDrunkStage(player).label} ($
             break;
           }
           if (args === 'clues' || args === '线索') {
-            const dockClues = Object.values(player.questProgress.dockCaseQuest?.clues || {});
-            const laobaoClues = Object.values(player.questProgress.laobaoMessageQuest?.clues || {});
-            const wastelandClues = Object.values(player.questProgress.wastelandQuest?.clues || {});
-            let clueMsg = '【当前线索】\n';
-            clueMsg += `码头疑案: ${dockClues.length ? '\n- ' + dockClues.join('\n- ') : '暂无'}\n\n`;
-            clueMsg += `丽春院密信: ${laobaoClues.length ? '\n- ' + laobaoClues.join('\n- ') : '暂无'}\n\n`;
-            clueMsg += `城西怪影: ${wastelandClues.length ? '\n- ' + wastelandClues.join('\n- ') : '暂无'}\n>`;
+            const dockQuest = player.questProgress.dockCaseQuest || { stage: 'idle', clues: {}, solved: false };
+            const laobaoQuest = player.questProgress.laobaoMessageQuest || { stage: 'idle', clues: {}, solved: false };
+            const wastelandQuest = player.questProgress.wastelandQuest || { stage: 'idle', clues: {}, solved: false };
+            const dockClues = Object.values(dockQuest.clues || {});
+            const laobaoClues = Object.values(laobaoQuest.clues || {});
+            const wastelandClues = Object.values(wastelandQuest.clues || {});
+            const stageText = quest => quest.stage === 'done' ? '已办结' : quest.stage === 'started' ? '追查中' : '未接';
+            let clueMsg = '【江湖任务簿】\n';
+            clueMsg += `码头疑案（${stageText(dockQuest)}）`;
+            clueMsg += dockClues.length ? `\n- ${dockClues.join('\n- ')}` : '\n- 暂无线索';
+            clueMsg += dockQuest.stage === 'done' ? '\n- 此案已了，不可重复领赏。\n\n' : dockQuest.stage === 'started' ? '\n- 若要定案，最好当着情报贩子的面指人。\n\n' : '\n\n';
+            clueMsg += `丽春院密信（${stageText(laobaoQuest)}）`;
+            clueMsg += laobaoClues.length ? `\n- ${laobaoClues.join('\n- ')}` : '\n- 暂无线索';
+            clueMsg += laobaoQuest.stage === 'done' ? '\n- 老鸨已收话，不会再为此另给赏钱。\n\n' : laobaoQuest.stage === 'started' ? '\n- 查明后须在老鸨在场时回报。\n\n' : '\n\n';
+            clueMsg += `城西怪影（${stageText(wastelandQuest)}）`;
+            clueMsg += wastelandClues.length ? `\n- ${wastelandClues.join('\n- ')}` : '\n- 暂无线索';
+            clueMsg += wastelandQuest.stage === 'done' ? '\n- 城西怪影已破，不可重复领奖。\n>' : wastelandQuest.stage === 'started' ? '\n- 最好夜探破庙，拿到硬证后再去回话。\n>' : '\n>';
             ws.send(clueMsg);
             break;
           }
           if (args === 'solve 码头疑案') {
-            ws.send('用法: quest solve 码头疑案 情报贩子\n你也可以先输入 quest clues 查看当前线索。\n>');
+            ws.send('【定案提示】\n你若已把线索拼得差不多，可输入:\nquest solve 码头疑案 情报贩子\n若心里还没底，先翻一翻 quest clues 看现在线头收到了哪一步。\n>');
             break;
           }
           if (args === 'solve 丽春院密信') {
-            ws.send('用法: quest solve 丽春院密信 客栈老板\n你也可以先输入 quest clues 查看当前线索。\n>');
+            ws.send('【定案提示】\n你若已摸清递信人的路数，可输入:\nquest solve 丽春院密信 客栈老板\n若还只是半懂不懂，先用 quest clues 把线索再捋一遍。\n>');
             break;
           }
           if (args === 'solve 城西怪影') {
-            ws.send('用法: quest solve 城西怪影 黑衣怪客\n你也可以先输入 quest clues 查看当前线索。\n>');
+            ws.send('【定案提示】\n你若已拿到足够硬证，可输入:\nquest solve 城西怪影 黑衣怪客\n若还差最后一口咬死对方的证据，先看看 quest clues，最好夜里再去一趟破庙。\n>');
             break;
           }
           if (args && args.startsWith('solve 码头疑案 ')) {
@@ -6508,15 +6607,31 @@ ${Number(player.drunk || 0) > 0 ? `║ 酒意: ${getDrunkStage(player).label} ($
             } else {
               noteNpcInteraction('六扇门捕头', player, 'inquire', { topic: '误判案情', sensitive: true });
               saveProgress();
-              ws.send(`【判断有误】\n你将嫌疑指向【${answer}】，六扇门捕头却皱了皱眉。\n他没有当场驳你，只冷冷说了一句：“线索还没拼明白，别急着下断语。”\n>`);
+              let wrongMsg = '六扇门捕头却皱了皱眉，冷冷道：「线索还没拼明白，别急着下断语。」';
+              if (/客栈老板|店家|掌柜/.test(answer)) wrongMsg = '六扇门捕头轻轻摇头：「客栈老板顶多是见得多、嘴也紧，还不像敢把整条线扛在身上的人。」';
+              else if (/老鸨|丽春院/.test(answer)) wrongMsg = '六扇门捕头看了你一眼：「老鸨在扬州混得久，未必干净，但真要在码头换手递信，她太扎眼了。」';
+              else if (/脚夫|船夫|跑船|伙计/.test(answer)) wrongMsg = '六扇门捕头哼了一声：「那些脚夫船夫多半只是看见了什么，不像能把消息网织得这么细。」';
+              else if (/黑衣|怪客|怪人/.test(answer)) wrongMsg = '六扇门捕头沉声道：「你把城西那套怪谈也扯进来了。码头这案子讲的是换手传信，不是装神弄鬼。」';
+              ws.send(`【判断有误】\n你将嫌疑指向【${answer}】。\n${wrongMsg}\n>`);
             }
             break;
           }
           if (args && args.startsWith('solve 丽春院密信 ')) {
             const answer = args.substring('solve 丽春院密信 '.length).trim();
-            const clues = player.questProgress.laobaoMessageQuest?.clues || {};
+            const laobaoQuest = player.questProgress.laobaoMessageQuest || { stage: 'idle', clues: {}, solved: false };
+            const clues = laobaoQuest.clues || {};
+            if (laobaoQuest.solved || laobaoQuest.stage === 'done') {
+              ws.send('【丽春院密信】这桩事你早已替老鸨办妥了，院里不会再让你重复领赏。\n>');
+              break;
+            }
             if (Object.keys(clues).length < 2) {
               ws.send('你眼下还只是听风就是雨，再多找两处线索再来。\n>');
+              break;
+            }
+            const roomNow = getRoom(player.room);
+            const laobaoHere = !!resolveNpcName('老鸨', roomNow);
+            if (!laobaoHere) {
+              ws.send('这事牵着丽春院的脸面。你既然要交差，至少得当着老鸨的面把人点出来。\n>');
               break;
             }
             if (answer === '客栈老板') {
@@ -6526,11 +6641,16 @@ ${Number(player.drunk || 0) > 0 ? `║ 酒意: ${getDrunkStage(player).label} ($
               player.coin += 35;
               noteNpcInteraction('老鸨', player, 'gift');
               saveProgress();
-              ws.send('【任务完成: 丽春院密信】\n老鸨听完你的判断，只是意味深长地笑了笑，显然把你记在心上了。\n奖励: 经验+50 铜钱+35\n今后老鸨对你说真话的概率会更高。\n>');
+              ws.send('【任务完成: 丽春院密信】\n你当着老鸨的面把几条线索一一摆开，点出递信的人正是客栈老板。老鸨先是轻轻一笑，随即把你的名字牢牢记下。\n奖励: 经验+50 铜钱+35\n今后老鸨对你说真话的概率会更高。\n>');
             } else {
               noteNpcInteraction('老鸨', player, 'inquire', { topic: '误判递信人', sensitive: true });
               saveProgress();
-              ws.send(`【判断有误】\n老鸨听你报出【${answer}】，只用手帕掩嘴笑了笑：“客官这回看错人啦，不过也不算全无眼力。”\n>`);
+              let wrongMsg = '老鸨只用手帕掩嘴笑了笑：「客官这回看错人啦，不过也不算全无眼力。」';
+              if (/情报贩子/.test(answer)) wrongMsg = '老鸨眼波一转，轻笑道：「情报贩子卖的是外头风声，不会蠢到跑我院里用这种笨法子递信。」';
+              else if (/跑船|船夫|脚夫/.test(answer)) wrongMsg = '老鸨慢悠悠摇扇道：「那些跑船汉子最多替人跑腿，真敢把线头伸进丽春院的，必是城里有落脚处的人。」';
+              else if (/老鸨|姑娘|龟公|丽春院/.test(answer)) wrongMsg = '老鸨哧地一笑：「你倒好，查来查去查到我自家头上了。真要是院里自己传话，还轮得到你来问我？」';
+              else if (/黑衣|怪客|怪人/.test(answer)) wrongMsg = '老鸨把团扇一合：「客官这是把城西那些怪谈也听进来了。这里查的是暗递消息，不是闹鬼。」';
+              ws.send(`【判断有误】\n老鸨听你报出【${answer}】后，${wrongMsg}\n>`);
             }
             break;
           }
@@ -6557,7 +6677,12 @@ ${Number(player.drunk || 0) > 0 ? `║ 酒意: ${getDrunkStage(player).label} ($
             } else {
               noteNpcInteraction('六扇门捕头', player, 'inquire', { topic: '误判城西怪影', sensitive: true });
               saveProgress();
-              ws.send(`【判断有误】\n你将城西怪影指向【${answer}】，六扇门捕头没有立刻反驳，只淡淡道：“荒地里的怪人不少，但真正串线的人未必最疯。”\n>`);
+              let wrongMsg = '六扇门捕头淡淡道：「荒地里的怪人不少，但真正串线的人未必最疯。」';
+              if (/疯癫老者|无名乞丐|疯和尚|井边怪人/.test(answer)) wrongMsg = '六扇门捕头低声道：「那些怪人多半只是被拿来做烟幕，真主事的不会把自己摆在最疯最显眼的地方。」';
+              else if (/情报贩子|客栈老板|老鸨/.test(answer)) wrongMsg = '六扇门捕头轻轻摇头：「你把城里的传话人和城西这条暗线混在一起了。城西怪影靠的是夜里露面和实地藏踪，不只是动嘴。」';
+              else if (/脚夫|船夫|跑船/.test(answer)) wrongMsg = '六扇门捕头道：「荒地、废井、破庙这一路，不像寻常跑腿人能独自压得住场面。」';
+              else if (/白伞|递信|密信/.test(answer)) wrongMsg = '六扇门捕头皱眉道：「那是码头疑案的路数。城西这桩，关键在破庙现身，不在纸条换手。」';
+              ws.send(`【判断有误】\n你将城西怪影指向【${answer}】。\n${wrongMsg}\n>`);
             }
             break;
           }
@@ -6833,21 +6958,42 @@ ETO组织正在为"他们"的到来做准备...
               saveProgress();
               break;
             }
+            if (['码头疑案', '丽春院密信', '城西怪影'].includes(player.quest)) {
+              const questMap = {
+                '码头疑案': player.questProgress.dockCaseQuest || { stage: 'idle', clues: {}, solved: false },
+                '丽春院密信': player.questProgress.laobaoMessageQuest || { stage: 'idle', clues: {}, solved: false },
+                '城西怪影': player.questProgress.wastelandQuest || { stage: 'idle', clues: {}, solved: false }
+              };
+              const questState = questMap[player.quest];
+              const clueList = Object.values(questState.clues || {});
+              const clueCount = clueList.length;
+              const statusText = questState.stage === 'done' ? '已办结' : questState.stage === 'started' ? '追查中' : '未开始';
+              const hintMap = {
+                '码头疑案': questState.stage === 'done' ? '这案子已经了结，六扇门不会再重复发赏。' : '去扬州码头、客栈、扬州小巷多搜多问。定案时，最好让情报贩子在场。',
+                '丽春院密信': questState.stage === 'done' ? '老鸨已收话，这事已经翻篇，不可重复领奖。' : '去丽春院、扬州码头、客栈、破庙继续搜寻。交差时，必须当着老鸨的面回报。',
+                '城西怪影': questState.stage === 'done' ? '城西怪影已破，后面只剩余波。' : '先在城西荒地、废井边、破庙、乱葬岗小路摸清线索，最好夜里去破庙拿硬证。'
+              };
+              let msg = `【江湖任务簿】\n当前任务: ${player.quest}\n状态: ${statusText}\n已得线索: ${clueCount}条\n`;
+              if (clueList.length) msg += `线索摘录:\n- ${clueList.join('\n- ')}\n`;
+              msg += `提点: ${hintMap[player.quest]}\n>`;
+              ws.send(msg);
+              break;
+            }
             ws.send(`【当前任务】${player.quest}\n进度: ${JSON.stringify(player.questProgress)}\n>`);
           } else {
             if (player.room === '粒子实验室' || player.room === '天文台' || player.room === '临海新港城·中央科研区') {
-              ws.send(`【任务系统】\n可接任务:\n- 三体降临 (需50经验)\n输入 "quest accept 三体降临" 接受任务\n>`);
+              ws.send(`【江湖任务簿】\n眼下可接:\n- 三体降临 (需50经验)\n若要应下，输入 quest accept 三体降临\n>`);
             } else if (player.room === '远洋客轮甲板' || player.room === '客轮船头' || player.room === '风暴海域') {
-              ws.send(`【任务系统】\n可接任务:\n- 远洋迷雾 (需30经验)\n输入 "quest accept 远洋迷雾" 接受任务\n>`);
+              ws.send(`【江湖任务簿】\n眼下可接:\n- 远洋迷雾 (需30经验)\n若要应下，输入 quest accept 远洋迷雾\n>`);
             } else if (player.room === '六扇门分署' || player.room === '六扇门捕头') {
-              ws.send(`【任务系统】\n可接任务:\n- 凤栖疑云 (需100经验)\n- 青衣楼阴谋 (需150经验)\n输入 "quest accept 凤栖疑云" 或 "quest accept 青衣楼阴谋" 接受任务\n>`);
+              ws.send(`【江湖任务簿】\n眼下可接:\n- 凤栖疑云 (需100经验)\n- 青衣楼阴谋 (需150经验)\n若要应下，可输入 quest accept 凤栖疑云 或 quest accept 青衣楼阴谋\n>`);
             } else if (player.room === '紫禁之巅' || player.room === '皇宫殿顶') {
-              ws.send(`【任务系统】\n可接任务:\n- 紫禁之战 (需200经验)\n输入 "quest accept 紫禁之战" 接受任务\n>`);
+              ws.send(`【江湖任务簿】\n眼下可接:\n- 紫禁之战 (需200经验)\n若要应下，输入 quest accept 紫禁之战\n>`);
             } else if (player.room === '桃花岛' || player.room === '桃花阵入口' || player.room === '桃花岛外') {
-              ws.send(`【任务系统】\n可接任务:\n- 桃花岛 (需60经验)\n输入 "quest accept 桃花岛" 接受任务\n>`);
+              ws.send(`【江湖任务簿】\n眼下可接:\n- 桃花岛 (需60经验)\n若要应下，输入 quest accept 桃花岛\n>`);
             } else {
-              ws.send(`【任务系统】\n你还没有任务。\n特定地点可接任务:
-- 六扇门分署: 凤栖疑云、青衣楼阴谋\n- 粒子实验室/天文台: 三体降临\n- 客轮甲板: 远洋迷雾\n>`);
+              ws.send(`【江湖任务簿】\n你眼下还没有领着的差事。\n若想找活做，可去这些地方看看:
+- 六扇门分署: 凤栖疑云、青衣楼阴谋\n- 粒子实验室 / 天文台: 三体降临\n- 客轮甲板: 远洋迷雾\n输入 quest 可随时翻看手头差事。\n>`);
           }
           }
           break;
