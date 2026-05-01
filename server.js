@@ -136,6 +136,33 @@ function markPlayerOffline(player) {
   db.removeOnlinePresence(player.name);
 }
 
+function listOnlinePlayersUnified() {
+  const dbRows = db.listOnlinePlayers();
+  const merged = new Map();
+
+  for (const row of dbRows) {
+    merged.set(row.user_name, {
+      user_name: row.user_name,
+      room: row.room || users[row.user_name]?.room || null,
+      title: users[row.user_name]?.title || '江湖人士',
+      source: 'db'
+    });
+  }
+
+  for (const [name, ws] of Object.entries(onlinePlayers)) {
+    if (!ws) continue;
+    const p = players[name] || users[name] || {};
+    merged.set(name, {
+      user_name: name,
+      room: p.room || merged.get(name)?.room || null,
+      title: users[name]?.title || p.title || '江湖人士',
+      source: merged.has(name) ? 'db+memory' : 'memory'
+    });
+  }
+
+  return Array.from(merged.values()).sort((a, b) => a.user_name.localeCompare(b.user_name, 'zh-Hans-CN'));
+}
+
 function restorePlayerFromStoredData(name, storedData) {
   const p = createPlayer(name);
   Object.assign(p, storedData);
@@ -5990,15 +6017,13 @@ wss.on('connection', (ws, req) => {
         case 'players':
         case 'online':
           let whoMsg = '\n【在线玩家】\n';
-          const onlineList = db.listOnlinePlayers();
-          if (onlineList.length === 0) {
+          const onlineList = listOnlinePlayersUnified();
+          const othersOnline = onlineList.filter(online => online.user_name !== player.name);
+          if (othersOnline.length === 0) {
             whoMsg += '当前没有其他玩家在线\n';
           } else {
-            for (const online of onlineList) {
-              if (online.user_name !== player.name) {
-                const title = users[online.user_name]?.title || '江湖人士';
-                whoMsg += `【${online.user_name}】${title} 在${online.room || '未知地点'}\n`;
-              }
+            for (const online of othersOnline) {
+              whoMsg += `【${online.user_name}】${online.title || '江湖人士'} 在${online.room || '未知地点'}\n`;
             }
             whoMsg += `共 ${onlineList.length} 人在线\n`;
           }
@@ -6012,7 +6037,7 @@ wss.on('connection', (ws, req) => {
             ws.send('用法: where 名称\n>');
             break;
           }
-          const onlineTarget = db.listOnlinePlayers().find(p => p.user_name === args);
+          const onlineTarget = listOnlinePlayersUnified().find(p => p.user_name === args);
           if (onlineTarget) {
             ws.send(`${args}正在${onlineTarget.room || '未知地点'}。\n>`);
             break;
